@@ -1,0 +1,27 @@
+DEVICE="$(sed -n -e "/\s\/overlay\s.*$/s///p" /etc/mtab)"
+echo ${DEVICE}
+uci -q delete fstab.rwm
+uci set fstab.rwm="mount"
+uci set fstab.rwm.device="${DEVICE}"
+uci set fstab.rwm.target="/rwm"
+uci commit fstab
+
+cat /etc/config/fstab
+
+DEVICE="/dev/mmcblk0p3"
+mkfs.ext4 ${DEVICE}
+
+eval $(block info ${DEVICE} | grep -o -e "UUID=\S*")
+uci -q delete fstab.overlay
+uci set fstab.overlay="mount"
+uci set fstab.overlay.uuid="${UUID}"
+uci set fstab.overlay.target="/overlay"
+uci commit fstab
+
+cat /etc/config/fstab
+
+mount ${DEVICE} /mnt/mmcblk0p3
+cp -f -a /overlay/* /mnt/mmcblk0p3
+umount /mnt/mmcblk0p3
+
+reboot
