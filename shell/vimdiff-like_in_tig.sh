@@ -4,13 +4,15 @@ RED="\033[31m"
 PLAIN='\033[0m'
 
 
-vim_diff_cfg="\"my_diff_set
+vim_diff_cfg="\"vim_diff_colors {{{
 if &diff
-    hi DiffAdd    cterm=bold ctermfg=12  guibg=LightBlue
-    hi DiffDelete cterm=bold ctermfg=13 ctermbg=14  gui=bold guifg=blue guibg=LightCyan
-    hi DiffChange cterm=bold ctermbg=green ctermfg=15  guibg=Magenta
-    hi DiffText   term=reverse cterm=bold ctermfg=9 gui=bold  guibg=Red
+    set t_Co=256
+    hi DiffAdd    ctermfg=233 ctermbg=194 guifg=#003300 guibg=#DDFFDD gui=none cterm=none
+    hi DiffChange ctermbg=0  guibg=#ececec gui=none   cterm=none
+    hi DiffText   ctermfg=233  ctermbg=189  guifg=#000033 guibg=#DDDDFF gui=none cterm=none
+    hi DiffDelete ctermfg=252 ctermbg=224   guifg=#DDCCCC guibg=#FFDDDD gui=none    cterm=none
 endif
+\"}}}
 "
 
 tig_set1="bind diff      <Enter>       !sh -c \"git difftool --tool=vimdiff  --no-prompt %(commit)^! -- %(file)\""
@@ -67,7 +69,7 @@ vim_diff_set()
 	if [ ! -e ~/.vim/vimrc ]; then
 		touch ~/.vim/vimrc
 	fi
-	find1=`cat ~/.vim/vimrc | grep "\"my_diff_set"`
+	find1=`cat ~/.vim/vimrc | grep "\"vim_diff_colors {{{"`
 	if [ "#$find1" == "#" ]; then
 		echo -e "$vim_diff_cfg" >> ~/.vim/vimrc
 	fi
@@ -76,7 +78,6 @@ vim_diff_set()
 
 tigrc_set()
 {
-	sudo_exec=`sudo_exec_string`
 	if [ ! -e ~/.tigrc ]; then
 		touch ~/.tigrc
 	fi
