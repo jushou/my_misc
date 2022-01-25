@@ -149,7 +149,7 @@ cp_file_rev()
 		echo "rm $SVN_REPO_DIR/$r_file -rf" >> $PATCH_DIR/$SVN_CMD_FILE
 		array_del[${#array_del[*]}]=$r_file
 
-		####删除的问价的dirname 加入待处理数组
+		####删除的文件的dirname 加入待处理数组
 		if [[ "#${array_folder[@]/`dirname $2`/}" == "#${array_folder[@]}" ]]; then
 			array_folder[${#array_folder[*]}]=`dirname $r_file`
 		fi
@@ -181,13 +181,12 @@ cp_file_rev()
 			echo "$exec_on_cmd" >> $PATCH_DIR/$SVN_CMD_FILE
 			gen_pre_cmd_check "\" exec $exec_on_cmd fail\"" $PATCH_DIR/$SVN_CMD_FILE
 		else
-			echo -e "$RED at $1 (git show $1:$r_file) fail change_type=$5 $PLAIN"
-			echo -e "patch at ${PATCH_DIR_DATE}/$REV2 $PLAIN"
+			echo -e "$RED at $1 (git show $1:$r_file) fail change_type=$5"
+			echo -e "patch at ${PATCH_DIR_DATE}/$REV2"
 			echo -e "you can  cat ${PATCH_DIR_DATE}/$REV2/all_raw.diff  check all changes $PLAIN"
 			exit -1
 		fi
 	fi
-
 }
 
 
@@ -322,7 +321,7 @@ gen_patch()
 	echo "svn commit -F $PATCH_DIR/$SVN_COMM_FILE " >> $PATCH_DIR/$SVN_CMD_FILE
 	###生成判断函数 上条命令是否执行成功
 	gen_pre_cmd_check "\"svn commit -F $PATCH_DIR/$SVN_COMM_FILE fail\"" $PATCH_DIR/$SVN_CMD_FILE
-	echo "$REV2 patch to $PATCH_DIR success"
+	echo "$REV2 success git show to $PATCH_DIR"
 
 }
 
