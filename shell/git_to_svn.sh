@@ -83,6 +83,24 @@ gen_pre_cmd_check()
 	echo -ne "\n"  >> $2
 }
 
+##执行成功就注释掉if else 语句
+### $1 提示语（注意 提示语中有空格则需要用双引号包裹）  
+### $2 生成在哪个shell脚本中
+### $3 第几if else 语句
+gen_pre_if_else()
+{
+	sed_pre=`expr $3 \* 8 + 2`
+	sed_next=`expr $sed_pre + 6`
+	echo "if [ \$? -ne 0 ]; then" >> $2
+	echo "	echo $1 " >> $2
+	echo "	exit -1" >> $2
+	echo "else" >> $2
+	echo "	sed -i '$sed_pre,$sed_next s/^/#/' $2" >> $2
+	echo "fi" >> $2
+	echo -ne "\n"  >> $2
+}
+
+
 ###生成svn st检查脚本 在执行同步到svn之前 检查svn仓库是否是干净的
 ###不干净则会使用svn revert 是的仓库是干净的
 ### $1 生成在哪个shell脚本中
@@ -230,7 +248,7 @@ gen_patch()
 	
 	###svn补丁脚本加入总的执行脚本中
 	echo $PATCH_DIR/$SVN_CMD_FILE >> ${PATCH_DIR_DATE}/patch_all.sh
-	gen_pre_cmd_check "\"exec  $PATCH_DIR/$SVN_CMD_FILE   fail\"" ${PATCH_DIR_DATE}/patch_all.sh
+	gen_pre_if_else "\"exec  $PATCH_DIR/$SVN_CMD_FILE   fail\"" ${PATCH_DIR_DATE}/patch_all.sh $3
 
 	chmod +x ${PATCH_DIR_DATE}/patch_all.sh
 	chmod +x $PATCH_DIR/$SVN_CMD_FILE
@@ -346,9 +364,11 @@ main()
 		echo "#!/bin/bash" > ${PATCH_DIR_DATE}/patch_all.sh
 
 		n_hast=(`git log --format=%H -$lastest_n`)
+		gen_patch_index=0
 		for((j=${#n_hast[@]}; j>=2; j--))
 		do
-			gen_patch ${n_hast[j-1]} ${n_hast[j-2]}
+			gen_patch ${n_hast[j-1]} ${n_hast[j-2]} $gen_patch_index
+			gen_patch_index=`expr $gen_patch_index + 1`
 			echo ${n_hast[j-2]} > $LATEST_COMMIT_ID
 		done
 	fi
