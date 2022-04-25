@@ -4,6 +4,7 @@ RED="\033[31m"
 PLAIN='\033[0m'
 
 PWD=`pwd`
+g_index=0
 
 
 SVN_CMD_FILE=svn_repo_sync_command.sh
@@ -100,8 +101,11 @@ gen_svn_st_check()
 ####补丁文件夹
 create_patch_dir()
 {
-	mkdir -p ${PATCH_DIR_DATE}/$REV2/modified
-	PATCH_DIR_MODIFIED=${PATCH_DIR_DATE}/$REV2/modified
+	g_index=`expr $g_index + 1`
+	num_index=`printf "%05d" $g_index`
+	REV2_NAME=${num_index}_$REV2
+	mkdir -p ${PATCH_DIR_DATE}/$REV2_NAME/modified
+	PATCH_DIR_MODIFIED=${PATCH_DIR_DATE}/$REV2_NAME/modified
 }
 
 
@@ -215,7 +219,7 @@ gen_patch()
 	fi
 
 	create_patch_dir
-	PATCH_DIR=${PATCH_DIR_DATE}/$REV2
+	PATCH_DIR=${PATCH_DIR_DATE}/$REV2_NAME
 	cd $PATCH_DIR
 
 	###生成svn补丁脚本（初始话svn补丁脚本）
@@ -331,7 +335,12 @@ main()
 	cd $GIT_REPO_DIR
 	lastest_n=`git log --format=%H | grep -n $1 | awk -F ":" '{print $1}'`
 	if [ "#$lastest_n" != "#" ]; then
-		echo "$lastest_n git commit finded"
+		if [ $lastest_n -eq 1 ]; then
+			echo "No commits to sync from git to svn"
+			exit 0
+		else
+			echo "$lastest_n git commit finded"
+		fi
 
 		mkdir -p ${PATCH_DIR_DATE}
 		echo "#!/bin/bash" > ${PATCH_DIR_DATE}/patch_all.sh
@@ -340,6 +349,7 @@ main()
 		for((j=${#n_hast[@]}; j>=2; j--))
 		do
 			gen_patch ${n_hast[j-1]} ${n_hast[j-2]}
+			echo ${n_hast[j-2]} > $LATEST_COMMIT_ID
 		done
 	fi
 }
@@ -392,22 +402,32 @@ SVN_NAME=${SVN_NAME%/}
 SVN_REPO_DIR=$PWD/$SVN_NAME
 GIT_REPO_DIR=$PWD/$GIT_NAME
 GIT_BRANCH_NAME=$BR_NAME
+LATEST_COMMIT_ID=$GIT_REPO_DIR/.sync_git_to_svn/latest_commit_id
 
 if [ ! -d $GIT_REPO_DIR/.sync_git_to_svn ]; then
 	mkdir $GIT_REPO_DIR/.sync_git_to_svn
 fi
 
-if [ ! -e $GIT_REPO_DIR/.sync_git_to_svn/start_git_repo_commit_id ]; then
+if [ ! -e $LATEST_COMMIT_ID ]; then
 	echo -e "$RED Please fill in a long commit id (GIT_NAME repository ) into"
-	echo -e "$GIT_REPO_DIR/.sync_git_to_svn/start_git_repo_commit_id $PLAIN"
+	echo -e "$LATEST_COMMIT_ID $PLAIN"
 	exit -1
 fi
 
 
 TOP_PATCH_DIR=patchs_git_to_svn/${GIT_NAME}_$BR_NAME
-#DATE=$(date +%Y-%m-%d_%H-%M-%S)
 DATE=$(date +%Y-%m-%d)
-BASE_PATCH_DIRNAME=$DATE
+date_index=1
+while true
+do
+date_num=`printf "%04d" $date_index`
+if [ ! -d $PWD/$TOP_PATCH_DIR/${DATE}_$date_num ]; then
+	BASE_PATCH_DIRNAME=${DATE}_$date_num
+	break
+else
+	date_index=`expr $date_index + 1`
+fi
+done
 PATCH_DIR_DATE=$PWD/$TOP_PATCH_DIR/$BASE_PATCH_DIRNAME
 
 ####git pull 到最新
@@ -436,9 +456,9 @@ svn_update_repo()
 	cd $curr_pwd
 }
 
-COMMIT_HASH=`sed -n '1p' $GIT_REPO_DIR/.sync_git_to_svn/start_git_repo_commit_id | grep -o -P "^[0-9a-fA-F]{40}"`
+COMMIT_HASH=`sed -n '1p' $LATEST_COMMIT_ID | grep -o -P "^[0-9a-fA-F]{40}"`
 if [ "#$COMMIT_HASH" == "#" ]; then
-	echo -e "$RED $GIT_REPO_DIR/.sync_git_to_svn/start_git_repo_commit_id format error"
+	echo -e "$RED $LATEST_COMMIT_ID format error"
 	echo -e "\t1.commit_id must be a long commit_id(40 characters hash) "
 	echo -e "\t2.commit_id must be on one line and no other characters $PLAIN"
 	exit -1
