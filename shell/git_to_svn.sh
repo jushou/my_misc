@@ -135,6 +135,8 @@ cp_file_rev()
 	cd $GIT_REPO_DIR
 	temp_file=$(mktemp)
 	r_file=$2
+	r_dirname_org=`dirname $2`
+	r_dirname_new=`dirname $3`
 
 	####重命名的情况
 	if [ "#$5" == "#R" ]; then
@@ -146,13 +148,13 @@ cp_file_rev()
 		
 
 		####重命名的文件夹加入待处理数组
-		if [[ "#${array_folder[@]/`dirname $2`/}" == "#${array_folder[@]}" ]]; then
-			array_folder[${#array_folder[*]}]=`dirname $2`
+		if [[ "#${array_folder[@]/$r_dirname_org/}" == "#${array_folder[@]}" ]]; then
+			array_folder[${#array_folder[*]}]=$r_dirname_org
 		fi
 
-		echo "mkdir -p $SVN_REPO_DIR/`dirname $r_file` 2>/dev/null" >> $PATCH_DIR/$SVN_CMD_FILE
-		echo "cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/`dirname $r_file` -rf" >> $PATCH_DIR/$SVN_CMD_FILE
-		gen_pre_cmd_check "\"exec cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/`dirname $r_file` -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
+		echo "mkdir -p $SVN_REPO_DIR/$r_dirname_new 2>/dev/null" >> $PATCH_DIR/$SVN_CMD_FILE
+		echo "cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
+		gen_pre_cmd_check "\"exec cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/$r_dirname_new -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
 	fi
 	
 	####其它用户有可执行权限才向svn中增加可执行权限
@@ -172,8 +174,8 @@ cp_file_rev()
 		array_del[${#array_del[*]}]=$r_file
 
 		####删除的文件的dirname 加入待处理数组
-		if [[ "#${array_folder[@]/`dirname $2`/}" == "#${array_folder[@]}" ]]; then
-			array_folder[${#array_folder[*]}]=`dirname $r_file`
+		if [[ "#${array_folder[@]/$r_dirname_org/}" == "#${array_folder[@]}" ]]; then
+			array_folder[${#array_folder[*]}]=$r_dirname_new
 		fi
 
 	else
@@ -183,9 +185,9 @@ cp_file_rev()
 			mv -f $temp_file $PATCH_DIR_MODIFIED/$r_file
 			
 			###生成svn补丁脚本
-			echo "mkdir -p $SVN_REPO_DIR/`dirname $r_file` 2>/dev/null" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/`dirname $r_file` -rf" >> $PATCH_DIR/$SVN_CMD_FILE
-			gen_pre_cmd_check "\"exec cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/`dirname $r_file` -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
+			echo "mkdir -p $SVN_REPO_DIR/$r_dirname_new 2>/dev/null" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
+			gen_pre_cmd_check "\"exec cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/$r_dirname_new -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
 			if [ "#$5" == "#A" ]; then
 				array_add[${#array_add[*]}]=$r_file
 			elif [ "#$5" == "#M" ]; then
@@ -204,8 +206,8 @@ cp_file_rev()
 			gen_pre_cmd_check "\" exec $exec_on_cmd fail\"" $PATCH_DIR/$SVN_CMD_FILE
 		else
 			echo -e "$RED at $1 (git show $1:$r_file) fail change_type=$5"
-			echo -e "patch at ${PATCH_DIR_DATE}/$REV2"
-			echo -e "you can  cat ${PATCH_DIR_DATE}/$REV2/all_raw.diff  check all changes $PLAIN"
+			echo -e "patch at ${PATCH_DIR_DATE}/$REV2_NAME"
+			echo -e "you can  cat ${PATCH_DIR_DATE}/$REV2_NAME/all_raw.diff  check all changes $PLAIN"
 			exit -1
 		fi
 	fi
