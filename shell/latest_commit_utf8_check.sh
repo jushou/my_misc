@@ -29,8 +29,8 @@ do_check()
         if [ "#${file_actions[i]}" != "#D" ]; then
             if [ -e ${file_news[i]} ] ; then
                 ####文件类型是text才做utf8检查
-                file_type=`file --mime-type ${file_news[i]} | awk -F ":" '{print $2}' | grep "text/"`
-                if [ "#$file_type" != "#" ]; then
+                file_type=`file -bi ${file_news[i]} | grep "charset=binary"`
+                if [ "#$file_type" == "#" ]; then
                     ###通过file匹配文件encoding 为us-ascii或者utf-8 才认为是utf8（不是很精确）
                     file_encode=`file --mime-encoding ${file_news[i]} | awk '{print $2}'`
                     if [ "#$file_encode" != "#utf-8" -a "#$file_encode" != "#us-ascii" ]; then
