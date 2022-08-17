@@ -5,6 +5,7 @@ PLAIN='\033[0m'
 
 PWD=`pwd`
 g_index=0
+NOT_PULL=0
 
 
 SVN_CMD_FILE=svn_repo_sync_command.sh
@@ -137,20 +138,19 @@ cp_file_rev()
 	r_file=$2
 	r_dirname_org=`dirname $2`
 	r_dirname_new=`dirname $3`
+	svn_a_cmd=""
+	svn_d_cmd=""
 
 	####重命名的情况
 	if [ "#$5" == "#R" ]; then
 		r_file=$3
 		###删除源文件（写入$SVN_CMD_FILE 脚本）
 		echo "rm $SVN_REPO_DIR/$2 -rf " >> $PATCH_DIR/$SVN_CMD_FILE
-		###加入删除数组中（svn del命令使用）
-		array_del[${#array_del[*]}]=$2
-		
+		svn_d_cmd="$2"
+		svn_a_cmd="$r_file"
 
-		####重命名的文件夹加入待处理数组
-		if [[ "#${array_folder[@]/$r_dirname_org/}" == "#${array_folder[@]}" ]]; then
-			array_folder[${#array_folder[*]}]=$r_dirname_org
-		fi
+		####重命名的文件夹加入待处理pending_folder
+		echo "$r_dirname_org" >> $PATCH_DIR/pending_folder
 
 		echo "mkdir -p $SVN_REPO_DIR/$r_dirname_new 2>/dev/null" >> $PATCH_DIR/$SVN_CMD_FILE
 		echo "cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -171,12 +171,15 @@ cp_file_rev()
 	if [ "#$5" == "#D" ]; then
 		rm -f $temp_file 
 		echo "rm $SVN_REPO_DIR/$r_file -rf" >> $PATCH_DIR/$SVN_CMD_FILE
-		array_del[${#array_del[*]}]=$r_file
-
-		####删除的文件的dirname 加入待处理数组
-		if [[ "#${array_folder[@]/$r_dirname_org/}" == "#${array_folder[@]}" ]]; then
-			array_folder[${#array_folder[*]}]=$r_dirname_new
+		svn_d_cmd="$r_file"
+		echo "cd $SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
+		if [ "$svn_d_cmd" != "" ]; then
+			echo "svn delete \"$svn_d_cmd\"" >> $PATCH_DIR/$SVN_CMD_FILE
 		fi
+		gen_pre_cmd_check "exec svn delete \"$svn_d_cmd\" fail" $PATCH_DIR/$SVN_CMD_FILE
+
+		####删除的文件的dirname 加入待处理pending_folder中
+		echo "$r_dirname_new" >> $PATCH_DIR/pending_folder
 
 	else
 		if git show $1:$r_file > $temp_file 2>/dev/null; then
@@ -189,7 +192,8 @@ cp_file_rev()
 			echo "cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
 			gen_pre_cmd_check "\"exec cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/$r_dirname_new -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
 			if [ "#$5" == "#A" ]; then
-				array_add[${#array_add[*]}]=$r_file
+				# array_add[${#array_add[*]}]=$r_file
+				svn_a_cmd="$r_file"
 			elif [ "#$5" == "#M" ]; then
 				###nothing to do
 				echo -n ""
@@ -202,6 +206,15 @@ cp_file_rev()
 			###文件权限管理
 			echo "chmod $4 $SVN_REPO_DIR/$r_file" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "cd $SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
+
+			if [ "$svn_d_cmd" != "" ]; then
+				echo "svn delete \"$svn_d_cmd\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			fi
+			gen_pre_cmd_check "exec svn delete \"$svn_d_cmd\" fail" $PATCH_DIR/$SVN_CMD_FILE
+			if [ "$svn_a_cmd" != "" ]; then
+				echo "svn add --parents \"$svn_a_cmd\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			fi
+			gen_pre_cmd_check "exec svn add --parents \"$svn_a_cmd\" fail" $PATCH_DIR/$SVN_CMD_FILE
 			echo "$exec_on_cmd" >> $PATCH_DIR/$SVN_CMD_FILE
 			gen_pre_cmd_check "\" exec $exec_on_cmd fail\"" $PATCH_DIR/$SVN_CMD_FILE
 		else
@@ -217,11 +230,6 @@ cp_file_rev()
 ####生成补丁文件，并生成svn的同步脚本
 gen_patch()
 {
-
-	array_add=()
-	array_del=()
-	array_folder=()
-
 	cd $GIT_REPO_DIR
 	REV1=$1
 	REV2=$2
@@ -241,12 +249,16 @@ gen_patch()
 	create_patch_dir
 	PATCH_DIR=${PATCH_DIR_DATE}/$REV2_NAME
 	cd $PATCH_DIR
+	
+	touch $PATCH_DIR/pending_folder
 
 	###生成svn补丁脚本（初始话svn补丁脚本）
 	echo "#!/bin/bash" > $PATCH_DIR/$SVN_CMD_FILE
 	gen_check_git_cmd
 	echo "cd $SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 	gen_svn_st_check $PATCH_DIR/$SVN_CMD_FILE
+	###清空svn空间 后 svn up 一下
+	echo "svn up " >> $PATCH_DIR/$SVN_CMD_FILE
 	
 	###svn补丁脚本加入总的执行脚本中
 	echo $PATCH_DIR/$SVN_CMD_FILE >> ${PATCH_DIR_DATE}/patch_all.sh
@@ -257,86 +269,78 @@ gen_patch()
 
 	mv -f $TMP_FILE all_raw.diff
 
-	file_modes=(`awk '{print $2}' all_raw.diff`)
-	file_actions=(`awk '{print $5}' all_raw.diff`)
-	file_olds=(`awk '{print $6}' all_raw.diff`)
-	file_news=(`awk '{if(NF==7){print $7} else {print $6}}' all_raw.diff`)
 
-	for((i=0;i<${#file_olds[@]};i++ ))
+	##这里将all_raw.diff按照个文件10000行的方式分割
+	##一个很大的提交差异全部保存在shell数组中会出现溢出的情况
+	page_ard_size=10000
+	ard_len=`cat all_raw.diff | wc -l`
+	page_ard_len=`expr $ard_len / $page_ard_size`
+	if [ `expr $ard_len % $page_ard_size` -ne 0 ]; then
+		page_ard_len=`expr $page_ard_len + 1`
+	fi
+	if [ $page_ard_len -eq 1 ]; then
+		cp all_raw.diff all_raw_0
+	fi
+	for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
 	do
-		file_action=${file_actions[i]}
-		file_action=${file_action:0:1}
-		file_mode=${file_modes[i]}
-		file_mode=${file_mode:1}
-		cp_file_rev $REV2 ${file_olds[i]} ${file_news[i]} $file_mode $file_action
+		start_line=`expr $ardp_i \* $page_ard_size + 1`
+		end_line=`expr $ardp_i \* $page_ard_size + $page_ard_size`
+		sed -n "$start_line , $end_line p" $PATCH_DIR/all_raw.diff > $PATCH_DIR/all_raw_$ardp_i
 	done
+	for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
+	do
+		file_modes=(`awk '{print $2}' $PATCH_DIR/all_raw_$ardp_i`)
+		file_actions=(`awk '{print $5}' $PATCH_DIR/all_raw_$ardp_i`)
+		file_olds=(`awk '{print $6}' $PATCH_DIR/all_raw_$ardp_i`)
+		file_news=(`awk '{if(NF==7){print $7} else {print $6}}' $PATCH_DIR/all_raw_$ardp_i`)
+		for((i=0;i<${#file_olds[@]};i++ ))
+		do
+			if [ `expr $i % 100` -eq 0 ]; then
+				echo -n "."
+			fi
+			file_action=${file_actions[i]}
+			file_action=${file_action:0:1}
+			file_mode=${file_modes[i]}
+			file_mode=${file_mode:1}
+			cp_file_rev $REV2 ${file_olds[i]} ${file_news[i]} $file_mode $file_action
+		done
+	done
+	rm $PATCH_DIR/all_raw_* -rf
 
 	###生成svn补丁脚本(提交信息 提交命令等)
 	echo "[`git_repo_get_commitid_author $REV2`] [`git_repo_get_commitid_date $REV2`]" > $PATCH_DIR/$SVN_COMM_FILE
 	git_repo_get_commitid_msg $REV2 >> $PATCH_DIR/$SVN_COMM_FILE
 
-	if [ ${#array_add[*]} -ne 0 ]; then
-		echo "cd $SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
-		# echo "svn add \"${array_add[*]}\"" >> $PATCH_DIR/$SVN_CMD_FILE
-		
-		##每50个文件为一组添加svn add命令
-		array_n=${#array_add[@]}
-		tmp_array=()
-		tmp_array_flag=1
-		for((i=0;i<$array_n;i++ ))
-		do
-			tmp_array_flag=1
-			tmp_array[${#tmp_array[*]}]=${array_add[i]}
-			if [ $(($i % 30)) -eq 29 ]; then
-				echo "svn add \"${tmp_array[*]}\"" >> $PATCH_DIR/$SVN_CMD_FILE
-				tmp_array=()
-				tmp_array_flag=0
-			fi
-		done
-		if [ $tmp_array_flag -eq 1 ]; then
-			echo "svn add \"${tmp_array[*]}\"" >> $PATCH_DIR/$SVN_CMD_FILE
-		fi
-		
-	fi
-
-	if [ ${#array_del[*]} -ne 0 ]; then
-		echo "cd $SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
-		
-		##每50个文件为一组添加svn delete命令
-		array_n=${#array_del[@]}
-		tmp_array=()
-		tmp_array_flag=1
-		for((i=0;i<$array_n;i++ ))
-		do
-			tmp_array_flag=1
-			tmp_array[${#tmp_array[*]}]=${array_del[i]}
-			if [ $(($i % 30)) -eq 29 ]; then
-				echo "svn delete \"${tmp_array[*]}\"" >> $PATCH_DIR/$SVN_CMD_FILE
-				tmp_array=()
-				tmp_array_flag=0
-			fi
-		done
-		if [ $tmp_array_flag -eq 1 ]; then
-			echo "svn delete \"${tmp_array[*]}\"" >> $PATCH_DIR/$SVN_CMD_FILE
-		fi
-	fi
-
+	sort -u -r $PATCH_DIR/pending_folder > $PATCH_DIR/temp_folder
+	mv $PATCH_DIR/temp_folder $PATCH_DIR/pending_folder
 
 	###处理可能需要删除的文件夹
-	if [ ${#array_folder[*]} -ne 0 ]; then
+	page_sfl_size=5000
+	space_folder_line=(`cat $PATCH_DIR/pending_folder | wc -l`)
+	if [ $space_folder_line -ne 0 ]; then
+		sfl_page_len=`expr $space_folder_line / $page_sfl_size`
+		if [ `expr $space_folder_line % $page_sfl_size` -ne 0 ]; then
+			sfl_page_len=`expr $sfl_page_len + 1`
+		fi
 		echo "cd $SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
-		for ar in ${array_folder[@]}
+		for((sflp_i=0;sflp_i<$sfl_page_len;sflp_i++))
 		do
-			echo "tmp_ar=$ar" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "if [ ! -d \$tmp_ar ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "	svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "else" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "	while [ \"#\`ls -A \$tmp_ar\`\" == \"#\" ]" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "		svn delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "		tmp_ar=\`dirname \$tmp_ar\`" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
+			start_line=`expr $sflp_i \* $page_sfl_size + 1`
+			end_line=`expr $sflp_i \* $page_sfl_size + $page_sfl_size`
+			array_peding=(`sed -n "$start_line , $end_line p" $PATCH_DIR/pending_folder`)
+			for ap in ${array_peding[@]}
+			do
+				echo "tmp_ar=$ap" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "if [ ! -d \$tmp_ar ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "	svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "else" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "	while [ \"#\`ls -A \$tmp_ar\`\" == \"#\" ]" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "		svn delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "		tmp_ar=\`dirname \$tmp_ar\`" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
+			done
 		done
 	fi
 
@@ -345,6 +349,7 @@ gen_patch()
 	echo "svn commit -F $PATCH_DIR/$SVN_COMM_FILE " >> $PATCH_DIR/$SVN_CMD_FILE
 	###生成判断函数 上条命令是否执行成功
 	gen_pre_cmd_check "\"svn commit -F $PATCH_DIR/$SVN_COMM_FILE fail\"" $PATCH_DIR/$SVN_CMD_FILE
+	echo "echo \"$REV2\" > $LATEST_COMMIT_ID" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "$REV2 success git show to $PATCH_DIR"
 
 }
@@ -360,6 +365,7 @@ main()
 			exit 0
 		else
 			echo "$lastest_n git commit finded"
+			echo "Generating patch files, please wait"
 		fi
 
 		mkdir -p ${PATCH_DIR_DATE}
@@ -371,7 +377,6 @@ main()
 		do
 			gen_patch ${n_hast[j-1]} ${n_hast[j-2]} $gen_patch_index
 			gen_patch_index=`expr $gen_patch_index + 1`
-			echo ${n_hast[j-2]} > $LATEST_COMMIT_ID
 		done
 	fi
 }
@@ -381,6 +386,7 @@ usage()
 	echo -e "\tgit_repo svn_repo and $0 must be in the same level directory "
 	echo -e "\t$0 -b -g -s "
 	echo -e "\t-g git_repo_path_name \n\t-b git_branch_name \n\t-s svn_repo_path_name "
+	echo -e "\t-n not pull git and svn repo"
 	echo -e "\tfor example: "
 	echo -e "\t\t$0 -b main -g git_repo -s svn_repo"
 	exit -1
@@ -391,7 +397,7 @@ if [ $# -eq 0 ]; then
 fi
 
 ###参数检查
-while getopts "g:s:b:" OPT
+while getopts "g:s:b:n" OPT
 do
 	case $OPT in
 		b)
@@ -400,6 +406,8 @@ do
 		SVN_NAME=$OPTARG ;;
 		g)
 		GIT_NAME=$OPTARG ;;
+		n)
+		NOT_PULL=1 ;;
 		?)
 		usage;;
 	esac
@@ -487,8 +495,10 @@ if [ "#$COMMIT_HASH" == "#" ]; then
 fi
 
 ###git svn 仓库都更新到最新
-git_pull_git_repo
-svn_update_repo
+if [ $NOT_PULL -eq 0 ]; then
+	git_pull_git_repo
+	svn_update_repo
+fi
 
 ##主函数
 main $COMMIT_HASH
