@@ -7,7 +7,6 @@ PWD=`pwd`
 g_index=0
 NOT_PULL=0
 
-
 SVN_CMD_FILE=svn_repo_sync_command.sh
 SVN_COMM_FILE=svn_commit_file
 
@@ -343,7 +342,6 @@ gen_patch()
 			done
 		done
 	fi
-
 	####svn commit 提交
 	echo "cd $SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "svn commit -F $PATCH_DIR/$SVN_COMM_FILE " >> $PATCH_DIR/$SVN_CMD_FILE
@@ -351,7 +349,6 @@ gen_patch()
 	gen_pre_cmd_check "\"svn commit -F $PATCH_DIR/$SVN_COMM_FILE fail\"" $PATCH_DIR/$SVN_CMD_FILE
 	echo "echo \"$REV2\" > $LATEST_COMMIT_ID" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "$REV2 success git show to $PATCH_DIR"
-
 }
 
 
@@ -460,6 +457,27 @@ fi
 done
 PATCH_DIR_DATE=$PWD/$TOP_PATCH_DIR/$BASE_PATCH_DIRNAME
 
+####检查分支是否存在
+git_check_br()
+{
+	curr_pwd=`pwd`
+	cd $GIT_REPO_DIR
+	curr_br=`git branch | grep -P "^\*" | awk '{print $2}'`
+	local_br=`git branch --all | grep "$BR_NAME\$" | wc -l`
+	if [ $local_br -eq 0 ]; then
+		echo -e "$RED\n branch ($BR_NAME) not exist in ${GIT_NAME} \n$PLAIN"
+		exit -1
+	fi
+	if [ "$curr_br" != "$BR_NAME" ];then
+		git checkout $BR_NAME
+		if [ $? -ne 0 ]; then
+			echo -e "$RED\n git checkout $BR_NAME error \n$PLAIN"
+			exit -1
+		fi
+	fi
+	cd $curr_pwd
+}
+
 ####git pull 到最新
 git_pull_git_repo()
 {
@@ -499,6 +517,8 @@ if [ $NOT_PULL -eq 0 ]; then
 	git_pull_git_repo
 	svn_update_repo
 fi
+
+git_check_br
 
 ##主函数
 main $COMMIT_HASH
