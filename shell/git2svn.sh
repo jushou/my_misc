@@ -129,7 +129,7 @@ create_patch_dir()
 
 
 # $1 is revision, $2 源文件, $3 新文件, $4 修改的文件权限
-# $5 文件的属性（增加：A  删除：D  修改：M  重命名：R）
+# $5 文件的属性（增加：A  删除：D  修改：M  重命名：R  类型变更 T）
 cp_file_rev()
 {
 	cd $GIT_REPO_DIR
@@ -174,8 +174,8 @@ cp_file_rev()
 		echo "cd $SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 		if [ "$svn_d_cmd" != "" ]; then
 			echo "svn delete \"$svn_d_cmd\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			gen_pre_cmd_check "exec svn delete \"$svn_d_cmd\" fail" $PATCH_DIR/$SVN_CMD_FILE
 		fi
-		gen_pre_cmd_check "exec svn delete \"$svn_d_cmd\" fail" $PATCH_DIR/$SVN_CMD_FILE
 
 		####删除的文件的dirname 加入待处理pending_folder中
 		echo "$r_dirname_new" >> $PATCH_DIR/pending_folder
@@ -193,13 +193,13 @@ cp_file_rev()
 			if [ "#$5" == "#A" ]; then
 				# array_add[${#array_add[*]}]=$r_file
 				svn_a_cmd="$r_file"
-			elif [ "#$5" == "#M" ]; then
+			elif [ "#$5" == "#M" -o "#$5" == "#T"]; then
 				###nothing to do
 				echo -n ""
 			elif [ "#$5" == "#R" ]; then
 				echo "at $1 $2 rename to $3"
 			else
-				echo -en "$RED $1:$r_file change_type unknow (A M D R) change_type=$5 $PLAIN"
+				echo -en "$RED $1:$r_file change_type unknow (A M D R T) change_type=$5 $PLAIN"
 				exit -1
 			fi
 			###文件权限管理
@@ -208,12 +208,12 @@ cp_file_rev()
 
 			if [ "$svn_d_cmd" != "" ]; then
 				echo "svn delete \"$svn_d_cmd\"" >> $PATCH_DIR/$SVN_CMD_FILE
+				gen_pre_cmd_check "exec svn delete \"$svn_d_cmd\" fail" $PATCH_DIR/$SVN_CMD_FILE
 			fi
-			gen_pre_cmd_check "exec svn delete \"$svn_d_cmd\" fail" $PATCH_DIR/$SVN_CMD_FILE
 			if [ "$svn_a_cmd" != "" ]; then
 				echo "svn add --parents \"$svn_a_cmd\"" >> $PATCH_DIR/$SVN_CMD_FILE
+				gen_pre_cmd_check "exec svn add --parents \"$svn_a_cmd\" fail" $PATCH_DIR/$SVN_CMD_FILE
 			fi
-			gen_pre_cmd_check "exec svn add --parents \"$svn_a_cmd\" fail" $PATCH_DIR/$SVN_CMD_FILE
 			echo "$exec_on_cmd" >> $PATCH_DIR/$SVN_CMD_FILE
 			gen_pre_cmd_check "\" exec $exec_on_cmd fail\"" $PATCH_DIR/$SVN_CMD_FILE
 		else
