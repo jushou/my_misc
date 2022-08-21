@@ -193,7 +193,7 @@ cp_file_rev()
 			if [ "#$5" == "#A" ]; then
 				# array_add[${#array_add[*]}]=$r_file
 				svn_a_cmd="$r_file"
-			elif [ "#$5" == "#M" -o "#$5" == "#T"]; then
+			elif [ "#$5" == "#M" -o "#$5" == "#T" ]; then
 				###nothing to do
 				echo -n ""
 			elif [ "#$5" == "#R" ]; then
