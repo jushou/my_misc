@@ -1,0 +1,31 @@
+#!/bin/bash
+
+function __do_space_deal()
+{
+	file_type=`file -bi $1 | grep "charset=binary"`
+	if [ "#$file_type" == "#" ]; then
+		sed -i  's/[ \t]\+$//' $1
+	fi
+}
+
+function tail_space_deal()
+{
+	if [ -f $1 ]; then
+		__do_space_deal $1
+	elif [ -d $1 ];then
+		dirs=(`ls $1`)
+		for el in  ${dirs[@]}
+		do
+			if [ -f $1/$el ]; then
+				__do_space_deal $1/$el
+			elif [ -d $1/$el ]; then
+				tail_space_deal $1/$el
+			fi
+		done
+	fi
+}
+
+for flist in $@
+do
+	tail_space_deal $flist
+done
