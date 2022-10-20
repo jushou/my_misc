@@ -3,6 +3,15 @@
 RED="\033[31m"
 PLAIN='\033[0m'
 
+check_CR_LF()
+{
+    crcl_n=`cat -A $1 | grep -n "\\^M\\\\$" | wc -l`
+    if [ $crcl_n -ne 0 ]; then
+        echo -e "\n\n$RED $1 exist $crcl_n CR LF $PLAIN\n\n"
+        error=1
+    fi
+}
+
 do_check()
 {
     ##临时文件夹保存git diff --raw的内容
