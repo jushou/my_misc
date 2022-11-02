@@ -1,6 +1,7 @@
 #/bin/bash
 
 RED="\033[31m"
+BLUE="\033[34m"
 PLAIN='\033[0m'
 
 PWD=`pwd`
@@ -130,6 +131,7 @@ create_patch_dir()
 
 # $1 is revision, $2 源文件, $3 新文件, $4 修改的文件权限
 # $5 文件的属性（增加：A  删除：D  修改：M  重命名：R  类型变更 T）
+# $6 是否有空格文件名
 cp_file_rev()
 {
 	cd $GIT_REPO_DIR
@@ -181,11 +183,44 @@ cp_file_rev()
 		echo "$r_dirname_new" >> $PATCH_DIR/pending_folder
 
 	else
-		if git show $1:$r_file > $temp_file 2>/dev/null; then
+		if [ $6 -eq 0 ]; then
+			git show $1:$r_file > $temp_file 2>/dev/null ;
+			git_show_rst=$?
+		else ##空格文件名特殊处理
+			echo "git show $1:$r_file > $temp_file 2>/dev/null" > /tmp/tmp_git2svn.sh
+			echo "exit \$?" >> /tmp/tmp_git2svn.sh
+			bash /tmp/tmp_git2svn.sh
+			git_show_rst=$?
+			if [ $git_show_rst -ne 0 ]; then
+				rm /tmp/tmp_git2svn.sh
+			fi
+		fi
+
+		if [ $git_show_rst -eq 0 ] ; then
 			###在补丁文件夹中生成文件
-			mkdir -p `dirname $PATCH_DIR_MODIFIED/$r_file`
-			mv -f $temp_file $PATCH_DIR_MODIFIED/$r_file
-			
+			if [ $6 -eq 0 ]; then
+				mkdir -p `dirname $PATCH_DIR_MODIFIED/$r_file`
+				mv -f $temp_file $PATCH_DIR_MODIFIED/$r_file
+			else ##空格文件名特殊处理
+				r_file_full=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' | sed 's#[^/]*$##g'`
+				echo "mkdir -p $r_file_full " > /tmp/tmp_git2svn.sh
+				echo "exit \$?" >> /tmp/tmp_git2svn.sh
+				bash /tmp/tmp_git2svn.sh
+				if [ $? -ne 0 ]; then
+					echo -e "$RED mkdir -p \`dirname $PATCH_DIR_MODIFIED/$r_file fail"
+					rm /tmp/tmp_git2svn.sh
+					exit -1
+				fi
+				echo "mv -f $temp_file $PATCH_DIR_MODIFIED/$r_file" > /tmp/tmp_git2svn.sh
+				echo "exit \$?" >> /tmp/tmp_git2svn.sh
+				bash /tmp/tmp_git2svn.sh
+				if [ $? -ne 0 ];then
+					echo -e "$RED mv -f $temp_file $PATCH_DIR_MODIFIED/$r_file fail"
+					rm /tmp/tmp_git2svn.sh
+					exit -1
+				fi
+				rm /tmp/tmp_git2svn.sh
+			fi
 			###生成svn补丁脚本
 			echo "mkdir -p $SVN_REPO_DIR/$r_dirname_new 2>/dev/null" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "cp $PATCH_DIR_MODIFIED/$r_file $SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -233,6 +268,8 @@ gen_patch()
 	REV1=$1
 	REV2=$2
 
+	echo "Processing $REV2"
+
 	TMP_FILE=$(mktemp)
 	####renameLimit设置为1048576
 	git config diff.renameLimit 1048576
@@ -269,41 +306,68 @@ gen_patch()
 	mv -f $TMP_FILE all_raw.diff
 
 
+	#检测是否存在空格
+	#special_char=`awk '{{if(NF>4){print 1} else {print 0}}}' all_raw.diff`
+	special_char=`awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep " " | wc -l`
+	if [ $special_char -eq 0 ]; then
+		special_char=`grep "[()]" all_raw.diff | wc -l`
+	fi
+
+	if [ $special_char -eq 0 ]; then
 	##这里将all_raw.diff按照个文件10000行的方式分割
 	##一个很大的提交差异全部保存在shell数组中会出现溢出的情况
-	page_ard_size=10000
-	ard_len=`cat all_raw.diff | wc -l`
-	page_ard_len=`expr $ard_len / $page_ard_size`
-	if [ `expr $ard_len % $page_ard_size` -ne 0 ]; then
-		page_ard_len=`expr $page_ard_len + 1`
-	fi
-	if [ $page_ard_len -eq 1 ]; then
-		cp all_raw.diff all_raw_0
-	fi
-	for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
-	do
-		start_line=`expr $ardp_i \* $page_ard_size + 1`
-		end_line=`expr $ardp_i \* $page_ard_size + $page_ard_size`
-		sed -n "$start_line , $end_line p" $PATCH_DIR/all_raw.diff > $PATCH_DIR/all_raw_$ardp_i
-	done
-	for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
-	do
-		file_modes=(`awk '{print $2}' $PATCH_DIR/all_raw_$ardp_i`)
-		file_actions=(`awk '{print $5}' $PATCH_DIR/all_raw_$ardp_i`)
-		file_olds=(`awk '{print $6}' $PATCH_DIR/all_raw_$ardp_i`)
-		file_news=(`awk '{if(NF==7){print $7} else {print $6}}' $PATCH_DIR/all_raw_$ardp_i`)
-		for((i=0;i<${#file_olds[@]};i++ ))
+		page_ard_size=10000
+		ard_len=`cat all_raw.diff | wc -l`
+		page_ard_len=`expr $ard_len / $page_ard_size`
+		if [ `expr $ard_len % $page_ard_size` -ne 0 ]; then
+			page_ard_len=`expr $page_ard_len + 1`
+		fi
+		if [ $page_ard_len -eq 1 ]; then
+			cp all_raw.diff all_raw_0
+		fi
+		for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
 		do
-			if [ `expr $i % 100` -eq 0 ]; then
+			start_line=`expr $ardp_i \* $page_ard_size + 1`
+			end_line=`expr $ardp_i \* $page_ard_size + $page_ard_size`
+			sed -n "$start_line , $end_line p" $PATCH_DIR/all_raw.diff > $PATCH_DIR/all_raw_$ardp_i
+		done
+		for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
+		do
+			file_modes=(`awk '{print $2}' $PATCH_DIR/all_raw_$ardp_i`)
+			file_actions=(`awk '{print $5}' $PATCH_DIR/all_raw_$ardp_i`)
+			file_olds=(`awk '{print $6}' $PATCH_DIR/all_raw_$ardp_i`)
+			file_news=(`awk '{if(NF==7){print $7} else {print $6}}' $PATCH_DIR/all_raw_$ardp_i`)
+			for((i=0;i<${#file_olds[@]};i++ ))
+			do
+				if [ `expr $i % 100` -eq 0 ]; then
+					echo -n "."
+				fi
+				file_action=${file_actions[i]}
+				file_action=${file_action:0:1}
+				file_mode=${file_modes[i]}
+				file_mode=${file_mode:1}
+				cp_file_rev $REV2 ${file_olds[i]} ${file_news[i]} $file_mode $file_action $special_char
+			done
+		done
+	else
+		echo -e "$BLUE special file name was detected at $REV2 $PLAIN"
+		all_size=`cat all_raw.diff | wc -l`
+		for((a_size_i=1;a_size_i<=$all_size;a_size_i++))
+		do
+			if [ `expr $a_size_i % 100` -eq 0 ]; then
 				echo -n "."
 			fi
-			file_action=${file_actions[i]}
-			file_action=${file_action:0:1}
-			file_mode=${file_modes[i]}
+			# file_old=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF>=2){print  $2} }' $PATCH_DIR/all_raw.diff | sed 's/ /\\\\ /g'`
+			# file_new=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF==3){print  $3} else {print $2}}' $PATCH_DIR/all_raw.diff | sed 's/ /\\\\ /g'`
+			file_old=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF>=2){print  $2} }' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g'`
+			file_new=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF==3){print  $3} else {print $2}}' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g'`
+			file_mode=`awk 'NR=="'$a_size_i'" {print $2}' $PATCH_DIR/all_raw.diff`
+			file_action=`awk 'NR=="'$a_size_i'" {print $5}' $PATCH_DIR/all_raw.diff`
 			file_mode=${file_mode:1}
-			cp_file_rev $REV2 ${file_olds[i]} ${file_news[i]} $file_mode $file_action
+			file_action=${file_action:0:1}
+			cp_file_rev $REV2 "$file_old" "$file_new" $file_mode $file_action $special_char
 		done
-	done
+	fi
 	rm $PATCH_DIR/all_raw_* -rf
 
 	###生成svn补丁脚本(提交信息 提交命令等)
