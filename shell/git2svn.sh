@@ -419,7 +419,11 @@ gen_patch()
 main()
 {
 	cd $GIT_REPO_DIR
-	lastest_n=`git log --format=%H | grep -n $1 | awk -F ":" '{print $1}'`
+	if [ "#$1" == "#null" ]; then
+		lastest_n=`git log --format=%H | wc -l`
+	else
+		lastest_n=`git log --format=%H | grep -n $1 | awk -F ":" '{print $1}'`
+	fi
 	if [ "#$lastest_n" != "#" ]; then
 		if [ $lastest_n -eq 1 ]; then
 			echo "No commits to sync from git to svn"
@@ -434,6 +438,10 @@ main()
 
 		n_hast=(`git log --format=%H -$lastest_n`)
 		gen_patch_index=0
+		if [ "#$1" == "#null"  ]; then
+			gen_patch ${n_hast[lastest_n-1]} ${n_hast[lastest_n-1]} $gen_patch_index
+			gen_patch_index=`expr $gen_patch_index + 1`
+		fi
 		for((j=${#n_hast[@]}; j>=2; j--))
 		do
 			gen_patch ${n_hast[j-1]} ${n_hast[j-2]} $gen_patch_index
@@ -457,7 +465,7 @@ if [ $# -eq 0 ]; then
 	usage
 fi
 
-###参数检查
+
 while getopts "g:s:b:n" OPT
 do
 	case $OPT in
@@ -475,51 +483,75 @@ do
 done
 
 
-if [ ! -d $SVN_NAME ];then
-	echo "arg -s $SVN_NAME not exist"
-	exit -1
-fi
 
-if [ ! -d $GIT_NAME ];then
-	echo "arg -g $GIT_NAME not exist"
-	exit -1
-fi
+####检测svn仓库和git仓库文件夹是否存在
+check_svn_git_name()
+{
+	if [ ! -d $SVN_NAME ];then
+		echo "arg -s $SVN_NAME not exist"
+		exit -1
+	fi
 
-
-###删除最后一个斜杠 /
-GIT_NAME=${GIT_NAME%/}
-SVN_NAME=${SVN_NAME%/}
-
-SVN_REPO_DIR=$PWD/$SVN_NAME
-GIT_REPO_DIR=$PWD/$GIT_NAME
-GIT_BRANCH_NAME=$BR_NAME
-LATEST_COMMIT_ID=$GIT_REPO_DIR/.sync_git_to_svn/latest_commit_id
-
-if [ ! -d $GIT_REPO_DIR/.sync_git_to_svn ]; then
-	mkdir $GIT_REPO_DIR/.sync_git_to_svn
-fi
-
-if [ ! -e $LATEST_COMMIT_ID ]; then
-	echo -e "$RED Please fill in a long commit id (GIT_NAME repository ) into"
-	echo -e "$LATEST_COMMIT_ID $PLAIN"
-	exit -1
-fi
+	if [ ! -d $GIT_NAME ];then
+		echo "arg -g $GIT_NAME not exist"
+		exit -1
+	fi
+}
 
 
-TOP_PATCH_DIR=patchs_git_to_svn/${GIT_NAME}_$BR_NAME
-DATE=$(date +%Y-%m-%d)
-date_index=1
-while true
-do
-date_num=`printf "%04d" $date_index`
-if [ ! -d $PWD/$TOP_PATCH_DIR/${DATE}_$date_num ]; then
-	BASE_PATCH_DIRNAME=${DATE}_$date_num
-	break
-else
-	date_index=`expr $date_index + 1`
-fi
-done
-PATCH_DIR_DATE=$PWD/$TOP_PATCH_DIR/$BASE_PATCH_DIRNAME
+init()
+{
+	###删除最后一个斜杠 /
+	GIT_NAME=${GIT_NAME%/}
+	SVN_NAME=${SVN_NAME%/}
+
+	SVN_REPO_DIR=$PWD/$SVN_NAME
+	GIT_REPO_DIR=$PWD/$GIT_NAME
+	GIT_BRANCH_NAME=$BR_NAME
+	LATEST_COMMIT_ID=$GIT_REPO_DIR/.sync_git_to_svn/${BR_NAME}_latest_commit_id
+
+	if [ ! -d $GIT_REPO_DIR/.sync_git_to_svn ]; then
+		mkdir $GIT_REPO_DIR/.sync_git_to_svn
+	fi
+
+	if [ ! -e $LATEST_COMMIT_ID ]; then
+		echo -e "$RED Please fill in a long commit id (GIT_NAME repository ) or null into"
+		echo -e "$LATEST_COMMIT_ID $PLAIN"
+		exit -1
+	fi
+
+	###生成补丁路径
+	TOP_PATCH_DIR=patchs_git_to_svn/${GIT_NAME}_$BR_NAME
+	DATE=$(date +%Y-%m-%d)
+	date_index=1
+	while true
+	do
+	date_num=`printf "%04d" $date_index`
+	if [ ! -d $PWD/$TOP_PATCH_DIR/${DATE}_$date_num ]; then
+		BASE_PATCH_DIRNAME=${DATE}_$date_num
+		break
+	else
+		date_index=`expr $date_index + 1`
+	fi
+	done
+	PATCH_DIR_DATE=$PWD/$TOP_PATCH_DIR/$BASE_PATCH_DIRNAME
+	
+	##检测$GIT_REPO_DIR/.sync_git_to_svn 是否正确
+	if [ "#`sed -n '1p' $LATEST_COMMIT_ID`" == "#null" ];then
+		COMMIT_HASH="null"
+	else
+		COMMIT_HASH=`sed -n '1p' $LATEST_COMMIT_ID | grep -o -P "^[0-9a-fA-F]{40}"`
+		if [ "#$COMMIT_HASH" == "#" ]; then
+			echo -e "$RED $LATEST_COMMIT_ID format error"
+			echo -e "\t1.commit_id must be a long commit_id(40 characters hash) "
+			echo -e "\t2.commit_id must be on one line and no other characters $PLAIN"
+			exit -1
+		fi
+	fi
+
+}
+
+
 
 ####检查分支是否存在
 git_check_br()
@@ -568,20 +600,19 @@ svn_update_repo()
 	cd $curr_pwd
 }
 
-COMMIT_HASH=`sed -n '1p' $LATEST_COMMIT_ID | grep -o -P "^[0-9a-fA-F]{40}"`
-if [ "#$COMMIT_HASH" == "#" ]; then
-	echo -e "$RED $LATEST_COMMIT_ID format error"
-	echo -e "\t1.commit_id must be a long commit_id(40 characters hash) "
-	echo -e "\t2.commit_id must be on one line and no other characters $PLAIN"
-	exit -1
-fi
+update_svn_git()
+{
+	###git svn 仓库都更新到最新
+	if [ $NOT_PULL -eq 0 ]; then
+		git_pull_git_repo
+		svn_update_repo
+	fi
+}
 
-###git svn 仓库都更新到最新
-if [ $NOT_PULL -eq 0 ]; then
-	git_pull_git_repo
-	svn_update_repo
-fi
-
+#####
+check_svn_git_name
+init
+update_svn_git
 git_check_br
 
 ##主函数
