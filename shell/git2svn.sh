@@ -33,14 +33,17 @@ git_repo_get_commitid_date()
 }
 
 ##获取commit 提交的信息  $1 表示commit_id
+##$2 表示追加的文件
 git_repo_get_commitid_msg()
 {
 	curr_pwd=`pwd`
 	cd $GIT_REPO_DIR
-	sub_msg_s=`git log --pretty=format:"%s" -1 $1`
-	sub_msg_b=`git log --pretty=format:"%b" -1 $1`
+	echo -en "\t" >> $2
+	git log --pretty=format:"%s" -1 $1 >> $2
+	echo -en "\t" >> $2
+	git log --pretty=format:"%b" -1 $1 >> $2
+	echo -en "\tgit_commit_id:$1" >> $2
 	cd $curr_pwd
-	echo -en "\t$sub_msg_s\n\n\t$sub_msg_b\n\tgit_commit_id:$1"
 }
 
 ##获取最新的commit_id
@@ -170,8 +173,8 @@ cp_file_rev()
 		r_dirname_org=`dirname $2`
 		r_dirname_new=`dirname $3`
 	else
-		r_dirname_org=`echo $2 | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' | sed 's#[^/]*$##g'`
-		r_dirname_new=`echo $3 | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' | sed 's#[^/]*$##g'`
+		r_dirname_org=`echo $2 | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' | sed 's#[^/]*$##g'`
+		r_dirname_new=`echo $3 | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' | sed 's#[^/]*$##g'`
 	fi
 	svn_a_cmd=""
 	svn_d_cmd=""
@@ -220,7 +223,7 @@ cp_file_rev()
 		if [ $6 -eq 0 ]; then
 			git show $1:$r_file > $temp_file 2>/dev/null ;
 			git_show_rst=$?
-		else ##空格文件名特殊处理
+		else ##空格等文件名特殊处理
 			echo "git show $1:$r_file > $temp_file 2>/dev/null" > /tmp/tmp_git2svn.sh
 			echo "exit \$?" >> /tmp/tmp_git2svn.sh
 			bash /tmp/tmp_git2svn.sh
@@ -236,7 +239,7 @@ cp_file_rev()
 				mkdir -p `dirname $PATCH_DIR_MODIFIED/$r_file`
 				mv -f $temp_file $PATCH_DIR_MODIFIED/$r_file
 			else ##空格文件名特殊处理
-				r_file_full=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' | sed 's#[^/]*$##g'`
+				r_file_full=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' | sed 's#[^/]*$##g'`
 				echo "mkdir -p $r_file_full " > /tmp/tmp_git2svn.sh
 				echo "exit \$?" >> /tmp/tmp_git2svn.sh
 				bash /tmp/tmp_git2svn.sh
@@ -344,11 +347,11 @@ gen_patch()
 	mv -f $TMP_FILE all_raw.diff
 
 
-	#检测是否存在空格
+	####特殊字符检测
 	#special_char=`awk '{{if(NF>4){print 1} else {print 0}}}' all_raw.diff`
 	special_char=`awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep " " | wc -l`
 	if [ $special_char -eq 0 ]; then
-		special_char=`grep "[()]" all_raw.diff | wc -l`
+		special_char=`grep "[()&]" all_raw.diff | wc -l`
 	fi
 
 	if [ $special_char -eq 0 ]; then
@@ -395,8 +398,8 @@ gen_patch()
 			if [ `expr $a_size_i % 100` -eq 0 ]; then
 				echo -n "."
 			fi
-			file_old=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF>=2){print  $2} }' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g'`
-			file_new=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF==3){print  $3} else {print $2}}' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g'`
+			file_old=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF>=2){print  $2} }' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g'`
+			file_new=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF==3){print  $3} else {print $2}}' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g'`
 			file_mode=`awk 'NR=="'$a_size_i'" {print $2}' $PATCH_DIR/all_raw.diff`
 			file_action=`awk 'NR=="'$a_size_i'" {print $5}' $PATCH_DIR/all_raw.diff`
 			file_mode=${file_mode:1}
@@ -408,13 +411,13 @@ gen_patch()
 
 	###生成svn补丁脚本(提交信息 提交命令等)
 	echo "[`git_repo_get_commitid_author $REV2`] [`git_repo_get_commitid_date $REV2`]" > $PATCH_DIR/$SVN_COMM_FILE
-	git_repo_get_commitid_msg $REV2 >> $PATCH_DIR/$SVN_COMM_FILE
+	git_repo_get_commitid_msg $REV2 $PATCH_DIR/$SVN_COMM_FILE
 
 	sort -u -r $PATCH_DIR/pending_folder > $PATCH_DIR/temp_folder
 	mv $PATCH_DIR/temp_folder $PATCH_DIR/pending_folder
 
 	###特殊字符检测
-	special_char=`grep "[ ()]" $PATCH_DIR/pending_folder | wc -l`
+	special_char=`grep "[ ()&]" $PATCH_DIR/pending_folder | wc -l`
 	space_folder_line=(`cat $PATCH_DIR/pending_folder | wc -l`)
 	###处理可能需要删除的文件夹
 	if [ $special_char -eq 0 ]; then
@@ -439,7 +442,7 @@ gen_patch()
 					echo "	while [ \"#\`ls -A \$tmp_ar\`\" == \"#\" ]" >> $PATCH_DIR/$SVN_CMD_FILE
 					echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
 					echo "		svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "		tmp_ar=\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
+					echo "		tmp_ar=\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
 					echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
 					echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
 				done
@@ -456,7 +459,7 @@ gen_patch()
 			echo "	while [ \"#\`ls -A \$tmp_ar\`\" == \"#\" ]" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "		svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "		tmp_ar=\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "		tmp_ar=\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
 		done
