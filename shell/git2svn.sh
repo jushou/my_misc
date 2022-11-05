@@ -41,7 +41,7 @@ git_repo_get_commitid_msg()
 	echo -en "\t" >> $2
 	git log --pretty=format:"%s" -1 $1 >> $2
 	echo -en "\t" >> $2
-	git log --pretty=format:"%b" -1 $1 >> $2
+	git log --pretty=format:"%b" -1 $1  >> $2
 	echo -en "\tgit_commit_id:$1" >> $2
 	cd $curr_pwd
 }
@@ -125,7 +125,8 @@ create_patch_dir()
 {
 	g_index=`expr $g_index + 1`
 	num_index=`printf "%05d" $g_index`
-	REV2_NAME=${num_index}_$REV2
+	bank_i=`expr $g_index / 1000`
+	REV2_NAME=$bank_i/${num_index}_$REV2
 	mkdir -p ${PATCH_DIR_DATE}/$REV2_NAME/modified
 	PATCH_DIR_MODIFIED=${PATCH_DIR_DATE}/$REV2_NAME/modified
 }
@@ -159,7 +160,19 @@ gen_find_top()
 }
 
 
-
+###检测命令是否存在 $1 需要检测的命令
+check_cmd()
+{
+	for cmd_i in $*
+	do
+		res=`which $cmd_i 2>/dev/null`
+		if [[ "$?" != "0" ]]; then
+			echo -e " ${RED} $cmd_i not exist please install $cmd_i ${PLAIN}";
+			exit 1
+		fi
+	done
+	
+}
 
 # $1 is revision, $2 源文件, $3 新文件, $4 修改的文件权限
 # $5 文件的属性（增加：A  删除：D  修改：M  重命名：R  类型变更 T）
@@ -312,7 +325,7 @@ gen_patch()
 	git config diff.renameLimit 1048576
 	####设置中文路径乱码的问题
 	git config core.quotepath false
-	git diff $REV1..$REV2 --raw > $TMP_FILE 
+	git diff $REV1..$REV2 --raw > $TMP_FILE
 	if [ $? -ne 0  ]; then
 		echo "Error: git diff failed."
 		rm -f $TMP_FILE
@@ -412,6 +425,7 @@ gen_patch()
 	###生成svn补丁脚本(提交信息 提交命令等)
 	echo "[`git_repo_get_commitid_author $REV2`] [`git_repo_get_commitid_date $REV2`]" > $PATCH_DIR/$SVN_COMM_FILE
 	git_repo_get_commitid_msg $REV2 $PATCH_DIR/$SVN_COMM_FILE
+	dos2unix $PATCH_DIR/$SVN_COMM_FILE &> /dev/null
 
 	sort -u -r $PATCH_DIR/pending_folder > $PATCH_DIR/temp_folder
 	mv $PATCH_DIR/temp_folder $PATCH_DIR/pending_folder
@@ -478,11 +492,11 @@ gen_patch()
 main()
 {
 	cd $GIT_REPO_DIR
-	if [ "#$1" == "#null" ]; then
-		lastest_n=`git log --format=%H | wc -l`
-	else
+	# if [ "#$1" == "#null" ]; then
+		# lastest_n=`git log --format=%H | wc -l`
+	# else
 		lastest_n=`git log --format=%H | grep -n $1 | awk -F ":" '{print $1}'`
-	fi
+	# fi
 	if [ "#$lastest_n" != "#" ]; then
 		if [ $lastest_n -eq 1 ]; then
 			echo "No commits to sync from git to svn"
@@ -498,10 +512,10 @@ main()
 
 		n_hast=(`git log --format=%H -$lastest_n`)
 		gen_patch_index=0
-		if [ "#$1" == "#null"  ]; then
-			gen_patch ${n_hast[lastest_n-1]} ${n_hast[lastest_n-1]} $gen_patch_index
-			gen_patch_index=`expr $gen_patch_index + 1`
-		fi
+		# if [ "#$1" == "#null"  ]; then
+			# gen_patch ${n_hast[lastest_n-1]} ${n_hast[lastest_n-1]} $gen_patch_index
+			# gen_patch_index=`expr $gen_patch_index + 1`
+		# fi
 		for((j=${#n_hast[@]}; j>=2; j--))
 		do
 			gen_patch ${n_hast[j-1]} ${n_hast[j-2]} $gen_patch_index
@@ -510,37 +524,6 @@ main()
 	fi
 }
 
-usage()
-{
-	echo -e "\tgit_repo svn_repo and $0 must be in the same level directory "
-	echo -e "\t$0 -b -g -s "
-	echo -e "\t-g git_repo_path_name \n\t-b git_branch_name \n\t-s svn_repo_path_name "
-	echo -e "\t-n not pull git and svn repo"
-	echo -e "\tfor example: "
-	echo -e "\t\t$0 -b main -g git_repo -s svn_repo"
-	exit -1
-}
-
-if [ $# -eq 0 ]; then
-	usage
-fi
-
-
-while getopts "g:s:b:n" OPT
-do
-	case $OPT in
-		b)
-		BR_NAME=$OPTARG ;;
-		s)
-		SVN_NAME=$OPTARG ;;
-		g)
-		GIT_NAME=$OPTARG ;;
-		n)
-		NOT_PULL=1 ;;
-		?)
-		usage;;
-	esac
-done
 
 
 
@@ -577,7 +560,7 @@ init()
 	fi
 
 	if [ ! -e $LATEST_COMMIT_ID ]; then
-		echo -e "$RED Please fill in a long commit id (GIT_NAME repository ) or null into"
+		echo -e "$RED Please fill in a long commit id (GIT_NAME repository ) into"
 		echo -e "$LATEST_COMMIT_ID $PLAIN"
 		exit -1
 	fi
@@ -605,9 +588,9 @@ init()
 	PATCH_DIR_DATE=$PWD/$TOP_PATCH_DIR/$BASE_PATCH_DIRNAME
 	
 	##检测$GIT_REPO_DIR/$GIT_SYNC_LOG_FOLDER 是否正确
-	if [ "#`sed -n '1p' $LATEST_COMMIT_ID`" == "#null" ];then
-		COMMIT_HASH="null"
-	else
+	# if [ "#`sed -n '1p' $LATEST_COMMIT_ID`" == "#null" ];then
+		# COMMIT_HASH="null"
+	# else
 		COMMIT_HASH=`sed -n '1p' $LATEST_COMMIT_ID | grep -o -P "^[0-9a-fA-F]{40}"`
 		if [ "#$COMMIT_HASH" == "#" ]; then
 			echo -e "$RED $LATEST_COMMIT_ID format error"
@@ -615,7 +598,7 @@ init()
 			echo -e "\t2.commit_id must be on one line and no other characters $PLAIN"
 			exit -1
 		fi
-	fi
+	# fi
 
 }
 
@@ -676,6 +659,41 @@ update_svn_git()
 		svn_update_repo
 	fi
 }
+
+usage()
+{
+	echo -e "\tgit_repo svn_repo and $0 must be in the same level directory "
+	echo -e "\t$0 -b -g -s "
+	echo -e "\t-g git_repo_path_name \n\t-b git_branch_name \n\t-s svn_repo_path_name "
+	echo -e "\t-n not pull git and svn repo"
+	echo -e "\tfor example: "
+	echo -e "\t\t$0 -b main -g git_repo -s svn_repo"
+	exit -1
+}
+
+if [ $# -eq 0 ]; then
+	usage
+fi
+
+
+while getopts "g:s:b:n" OPT
+do
+	case $OPT in
+		b)
+		BR_NAME=$OPTARG ;;
+		s)
+		SVN_NAME=$OPTARG ;;
+		g)
+		GIT_NAME=$OPTARG ;;
+		n)
+		NOT_PULL=1 ;;
+		?)
+		usage;;
+	esac
+done
+
+
+check_cmd dos2unix sed git
 
 #####
 check_svn_git_name
