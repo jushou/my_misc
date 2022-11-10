@@ -67,6 +67,7 @@ gen_check_git_cmd()
 	echo "	svn_find=\`svn log  | grep  -P \"git_commit_id:[0-9a-fA-F]{40}\" | grep \$commit_id | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "	if [ \$svn_find -ne 0 ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "		echo \"$REV2 patched to svn repository and skip\"" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "		echo \"$REV2\" > \$GIT2SVN_TOP/../$GIT_NAME/$GIT_SYNC_LOG_FOLDER/${BR_NAME}_latest_commit_id" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "		exit 0" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "	fi" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "	cd \$curr_pwd" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -521,6 +522,9 @@ main()
 			gen_patch ${n_hast[j-1]} ${n_hast[j-2]} $gen_patch_index
 			gen_patch_index=`expr $gen_patch_index + 1`
 		done
+	else
+		echo -e "$RED latest success commit id ($1) not find \n please check $LATEST_COMMIT_ID $PLAIN"
+		exit -1
 	fi
 }
 
@@ -706,4 +710,6 @@ main $COMMIT_HASH
 
 
 ###打入补丁
-#${PATCH_DIR_DATE}/patch_all.sh
+if [ -e ${PATCH_DIR_DATE}/patch_all.sh ]; then
+	${PATCH_DIR_DATE}/patch_all.sh
+fi
