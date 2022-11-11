@@ -46,15 +46,6 @@ git_repo_get_commitid_msg()
 	cd $curr_pwd
 }
 
-##获取最新的commit_id
-get_git_head_commit_id()
-{
-	curr_pwd=`pwd`
-	cd $GIT_REPO_DIR
-	head_commit=`git log -1 HEAD --pretty=format:"%H"`
-	cd $curr_pwd
-	echo $head_commit
-}
 
 ###生成shell函数 check_git_cmid_patch_to_svn 
 gen_check_git_cmd()
@@ -138,8 +129,6 @@ gen_find_top()
 {
 	echo "find_topdir()" >> $1
 	echo "{" >> $1
-	# echo "	dir=\"\`pwd\`/\$0\"" >> $1
-	# echo "	cd \`dirname \$dir\`" >> $1
 	echo "	if [ \"\${0:0:1}\" == \"/\" ]; then" >> $1
 	echo "		dir=\"\$0\"" >> $1
 	echo "	else" >> $1
@@ -208,7 +197,7 @@ cp_file_rev()
 		echo "cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
 		gen_pre_cmd_check "\"exec cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
 	fi
-	
+
 	####其它用户有可执行权限才向svn中增加可执行权限
 	exec_on=`expr $4 % 10`
 	exec_on_cmd=""
@@ -326,7 +315,20 @@ gen_patch()
 	git config diff.renameLimit 1048576
 	####设置中文路径乱码的问题
 	git config core.quotepath false
-	git diff $REV1..$REV2 --raw > $TMP_FILE
+	###$REV1和$REV2相等时只需要git diff $REV1 --raw 既可
+	if [ "#$REV1" == "#$REV2" ]; then
+		git show --raw $REV1 > $TMP_FILE
+		### 使用git show --raw $REV1 > $TMP_FILE 后 $TMP_FILE 等信息与 git diff $REV1..$REV2 --raw > $TMP_FILE
+		### 不一样所以这里通过sed删除前面几行git commit message信息 这里第一次提交必定时添加文件 所以 grep -nE
+		### 的时候匹配了 A 这新增的动作
+		show_raw_n=`grep -nE "^:[0-9]{6} [0-9]{6} [0-9a-f]+ [0-9a-f]+ A" $TMP_FILE | sed -n '1p' | awk -F ":" '{print $1}'`
+		if [ "#$show_raw_n" != "#" ];then
+			show_raw_n=`expr $show_raw_n - 1`
+			sed -i "1,${show_raw_n}d" $TMP_FILE
+		fi
+	else
+		git diff $REV1..$REV2 --raw > $TMP_FILE
+	fi
 	if [ $? -ne 0  ]; then
 		echo "Error: git diff failed."
 		rm -f $TMP_FILE
@@ -493,11 +495,11 @@ gen_patch()
 main()
 {
 	cd $GIT_REPO_DIR
-	# if [ "#$1" == "#null" ]; then
-		# lastest_n=`git log --format=%H | wc -l`
-	# else
+	if [ "#$1" == "#null" ]; then
+		lastest_n=`git log --format=%H | wc -l`
+	else
 		lastest_n=`git log --format=%H | grep -n $1 | awk -F ":" '{print $1}'`
-	# fi
+	fi
 	if [ "#$lastest_n" != "#" ]; then
 		if [ $lastest_n -eq 1 ]; then
 			echo "No commits to sync from git to svn"
@@ -513,10 +515,10 @@ main()
 
 		n_hast=(`git log --format=%H -$lastest_n`)
 		gen_patch_index=0
-		# if [ "#$1" == "#null"  ]; then
-			# gen_patch ${n_hast[lastest_n-1]} ${n_hast[lastest_n-1]} $gen_patch_index
-			# gen_patch_index=`expr $gen_patch_index + 1`
-		# fi
+		if [ "#$1" == "#null"  ]; then
+			gen_patch ${n_hast[lastest_n-1]} ${n_hast[lastest_n-1]} $gen_patch_index
+			gen_patch_index=`expr $gen_patch_index + 1`
+		fi
 		for((j=${#n_hast[@]}; j>=2; j--))
 		do
 			gen_patch ${n_hast[j-1]} ${n_hast[j-2]} $gen_patch_index
@@ -564,7 +566,7 @@ init()
 	fi
 
 	if [ ! -e $LATEST_COMMIT_ID ]; then
-		echo -e "$RED Please fill in a long commit id (GIT_NAME repository ) into"
+		echo -e "$RED Please fill in a long commit id ($GIT_NAME repository ) or |\"null\" into"
 		echo -e "$LATEST_COMMIT_ID $PLAIN"
 		exit -1
 	fi
@@ -590,11 +592,11 @@ init()
 	fi
 	done
 	PATCH_DIR_DATE=$PWD/$TOP_PATCH_DIR/$BASE_PATCH_DIRNAME
-	
-	##检测$GIT_REPO_DIR/$GIT_SYNC_LOG_FOLDER 是否正确
-	# if [ "#`sed -n '1p' $LATEST_COMMIT_ID`" == "#null" ];then
-		# COMMIT_HASH="null"
-	# else
+
+	#检测$GIT_REPO_DIR/$GIT_SYNC_LOG_FOLDER 是否正确
+	if [ "#`sed -n '1p' $LATEST_COMMIT_ID`" == "#null" ];then
+		COMMIT_HASH="null"
+	else
 		COMMIT_HASH=`sed -n '1p' $LATEST_COMMIT_ID | grep -o -P "^[0-9a-fA-F]{40}"`
 		if [ "#$COMMIT_HASH" == "#" ]; then
 			echo -e "$RED $LATEST_COMMIT_ID format error"
@@ -602,7 +604,7 @@ init()
 			echo -e "\t2.commit_id must be on one line and no other characters $PLAIN"
 			exit -1
 		fi
-	# fi
+	fi
 
 }
 
