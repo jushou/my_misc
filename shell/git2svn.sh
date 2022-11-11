@@ -1,5 +1,42 @@
 #/bin/bash
 
+###脚本大体分为两步：1.从git仓库中”git show" 每次commit的历史文件 我们称为（生成补丁）
+###                  2.将每次commit的历史文件同步到svn仓库        我们成为（打入补丁）
+### 大致原理如下：
+### 1. 本脚本主要通过 git diff $REV1..$REV2 --raw 来从git仓库中获得每次commit的修改并保存在all_raw.diff中
+### 2. 然后通过解析all_raw.diff文件,使用git show $commit_id  file 的方式将每次commit_id的修改的文件全部show 出来
+###      同时每个commit都会生成一个名为svn_repo_sync_command.sh的脚本用于将"git show"出来的文件同步到svn仓库中
+### 3.同时会有一个patch_all.sh的脚本来统一管理好这些"svn_repo_sync_command.sh"脚本（每次成功执行一次
+###      svn_repo_sync_command.sh后patch_all.sh脚本会自动只掉要调用该svn_repo_sync_command.sh的代码行）
+
+### 该脚本需要如下前提条件
+### 已经配置好需要同步的git仓库和svn仓库(git仓库和svn仓库下均能正常执行git 或 svn相关命令 而不需要每次输入密码)
+### 如下实例：
+### 确保配置好需要同步的git svn仓库：如下所述
+### 1.工作目录下有两个文件夹(git_repo svn_repo)和一个文件(git2svn.sh)
+###      git_repo svn_repo git2svn.sh
+###   git_repo 表示git仓库 这个仓库能够正常执行git status 、git log 、 git pull 等操作(不需要输入用户名密码)
+###   svn_repo 表示svn仓库 这个仓库能够正常执行svn st 、svn log 、 git up 等操作(不需要输入用户名密码)
+### 2.执行./git2svn.sh -b main -g git_repo -s svn_repo
+###     其中 -b 表示 同步 git 仓库的 main分支
+###     其中 -g 表示 同步 git 仓库的 所在目录
+###     其中 -s 表示 同步 svn 仓库的 所在目录
+### 3.初次执行./git2svn.sh -b main -g git_repo -s svn_repo会如下出错信息：(因为脚本还不知道需要从git 的那次提交开始同步)
+###      ./git2svn.sh -b main -g wifi/ -s svn_wifi/
+###       Please fill in a long commit id (wifi repository ) or |"null" into
+###      /home/work/workspace/git/test/wifi/.sync_git_to_svn/main_latest_commit_id
+###    需要在git仓库wifi的.sync_git_to_svn/main_latest_commit_id中填写最后一次成功同步的commit id
+###    也可以输入在该文件第一行中填入 null 表示从git 仓库第一次commit 开始同步
+### 4.git2svn.sh脚本完成的第一步（生成补丁）后 会在 git_repo svn_repo git2svn.sh同级目录下生成 patchs_git_to_svn
+###     文件夹，该文件夹下会根据 仓库名_分支/日期_序号/ 的方式生成二级文件夹 该文件夹下包含前文提到的 patch_all.sh 脚本
+###     和所有的（生成补丁）步骤中的历史文件
+###   正常情况下 git2svn.sh 脚本会自动调用 patch_all.sh 脚本来实现git 到 svn 的同步
+###   如果出现错误可以根据错误提示确认错误发生的原因，出来好后再次手动调用patch_all.sh脚本可以完成后续未完成的事情
+### 5.成功执行同步后git2svn.sh脚本会主动删除 patchs_git_to_svn/仓库名_分支/日期_序号/ 文件夹
+###   否则生成的 patchs_git_to_svn/仓库名_分支/日期_序号/ 文件夹不会被删除
+
+
+
 RED="\033[31m"
 BLUE="\033[34m"
 PLAIN='\033[0m'
@@ -531,8 +568,6 @@ main()
 }
 
 
-
-
 ####检测svn仓库和git仓库文件夹是否存在
 check_svn_git_name()
 {
@@ -546,8 +581,6 @@ check_svn_git_name()
 		exit -1
 	fi
 }
-
-
 
 
 init()
@@ -714,4 +747,12 @@ main $COMMIT_HASH
 ###打入补丁
 if [ -e ${PATCH_DIR_DATE}/patch_all.sh ]; then
 	${PATCH_DIR_DATE}/patch_all.sh
+fi
+
+if [ $? -ne 0 ]; then
+	echo "An error occurred while executing the ${PATCH_DIR_DATE}/patch_all.sh "
+	exit -1
+else
+	rm  ${PATCH_DIR_DATE}/ -rf
+	echo "git to svn success!!!"
 fi
