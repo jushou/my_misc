@@ -123,15 +123,16 @@ gen_pre_cmd_check()
 ### $1 提示语（注意 提示语中有空格则需要用双引号包裹）  
 ### $2 生成在哪个shell脚本中
 ### $3 第几if else 语句
+### $4 注释哪个文件
 gen_pre_if_else()
 {
-	sed_pre=`expr $3 \* 8 + 44`
+	sed_pre=`expr $3 \* 8 + 22`
 	sed_next=`expr $sed_pre + 6`
 	echo "if [ \$? -ne 0 ]; then" >> $2
 	echo "	echo $1 " >> $2
 	echo "	exit -1" >> $2
 	echo "else" >> $2
-	echo "	sed -i '$sed_pre,$sed_next s/^/#/' \$GIT2SVN_TOP/\$BR_DIR/patch_all.sh" >> $2
+	echo "	sed -i '$sed_pre,$sed_next s/^/#/' $4" >> $2
 	echo "fi" >> $2
 	echo -ne "\n"  >> $2
 }
@@ -377,6 +378,9 @@ cp_file_rev()
 
 
 ####生成补丁文件，并生成svn的同步脚本
+### $1 REV1
+### $2 REV1
+### $3 index
 gen_patch()
 {
 	cd $GIT_REPO_DIR
@@ -415,6 +419,15 @@ gen_patch()
 	cd $PATCH_DIR
 
 	touch $PATCH_DIR/pending_folder
+	arg3=`expr $3 % 1000`
+	base3=`expr $3 / 1000`
+	if [ $arg3 -eq 0 ];then
+		echo "#!/bin/bash" > ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh
+		chmod +x ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh
+		gen_find_top ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh
+		echo "\$GIT2SVN_TOP/\$BR_DIR/$base3/patch_all_$base3.sh" >> ${PATCH_DIR_DATE}/patch_all.sh
+		gen_pre_cmd_check "\"exec \$GIT2SVN_TOP/\$BR_DIR/$base3/patch_all_$base3.sh error\"" ${PATCH_DIR_DATE}/patch_all.sh
+	fi
 
 	###生成svn补丁脚本（初始化svn补丁脚本）
 	echo "#!/bin/bash" > $PATCH_DIR/$SVN_CMD_FILE
@@ -428,10 +441,10 @@ gen_patch()
 	echo "svn up " >> $PATCH_DIR/$SVN_CMD_FILE
 	
 	###svn补丁脚本加入总的执行脚本中
-	echo "\$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/$SVN_CMD_FILE" >> ${PATCH_DIR_DATE}/patch_all.sh
-	gen_pre_if_else "\"exec  \$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/$SVN_CMD_FILE  fail\"" ${PATCH_DIR_DATE}/patch_all.sh $3
+	echo "\$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/$SVN_CMD_FILE" >> ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh
+	gen_pre_if_else "\"exec  \$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/$SVN_CMD_FILE  fail\"" ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh $arg3 \$GIT2SVN_TOP/\$BR_DIR/$base3/patch_all_$base3.sh
 
-	chmod +x ${PATCH_DIR_DATE}/patch_all.sh
+
 	chmod +x $PATCH_DIR/$SVN_CMD_FILE
 
 	mv -f $TMP_FILE all_raw.diff
@@ -585,6 +598,7 @@ main()
 
 		mkdir -p ${PATCH_DIR_DATE}
 		echo "#!/bin/bash" > ${PATCH_DIR_DATE}/patch_all.sh
+		chmod +x ${PATCH_DIR_DATE}/patch_all.sh
 		gen_find_top ${PATCH_DIR_DATE}/patch_all.sh
 		gen_git_commitid_list ${PATCH_DIR_DATE}/patch_all.sh \$GIT2SVN_TOP/\$BR_DIR/git_commitid_list
 
