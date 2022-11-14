@@ -223,6 +223,12 @@ gen_common_git_commitid_list()
 	echo "${G_CC_F}sed -i -e '24,40 s/^/#/' -e '$ s/^/#/' \$GIT2SVN_TOP/\$BR_DIR/patch_all.sh" >> $1
 }
 
+## 注释到 git_commitid_list
+gen_common_patch_all_x_pre()
+{
+	echo "sed -i -e '2,21 s/^/#/' -e '$ s/^/#/' $1" >> $2
+}
+
 
 ###检测命令是否存在 $1 需要检测的命令
 check_cmd()
@@ -441,6 +447,10 @@ gen_patch()
 	###svn补丁脚本加入总的执行脚本中
 	echo "\$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/$SVN_CMD_FILE" >> ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh
 	gen_pre_if_else "\"exec  \$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/$SVN_CMD_FILE  fail\"" ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh $arg3 \$GIT2SVN_TOP/\$BR_DIR/$base3/patch_all_$base3.sh
+
+	if [ $arg3 -eq 999 ]; then
+		gen_common_patch_all_x_pre "\$GIT2SVN_TOP/\$BR_DIR/$base3/patch_all_$base3.sh" ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh
+	fi
 
 
 	chmod +x $PATCH_DIR/$SVN_CMD_FILE
