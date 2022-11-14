@@ -203,14 +203,12 @@ gen_git_commitid_list()
 	echo "${G_CC_F}if [ \$? = 0 ]; then" >> $1
 	echo "${G_CC_F}	svn log | grep \"git_commit_id:\" > $2 & " >> $1
 	echo "${G_CC_F}	echo \"generate git_commitid_list please wait\" " >> $1
-	echo "${G_CC_F}	pre_gen_gcl_st=0" >> $1
-	echo "${G_CC_F}	curr_gen_gcl_st=\`expr \$pre_gen_gcl_st + 5\`" >> $1
-	echo "${G_CC_F}	while ((curr_gen_gcl_st!=pre_gen_gcl_st))" >> $1
+	echo "${G_CC_F}	bc_jobs=\`jobs | grep \"git_commit_id:\" | grep -i running | wc -l \`" >> $1
+	echo "${G_CC_F}	while ((bc_jobs!=0))" >> $1
 	echo "${G_CC_F}	do" >> $1
 	echo "${G_CC_F}		echo -n \".\"" >> $1
 	echo "${G_CC_F}		sleep 2" >> $1
-	echo "${G_CC_F}		pre_gen_gcl_st=\$curr_gen_gcl_st" >> $1
-	echo "${G_CC_F}		curr_gen_gcl_st=\`stat $2 -c %Y\`" >> $1
+	echo "${G_CC_F}		bc_jobs=\`jobs | grep \"git_commit_id:\" | grep -i running | wc -l \`" >> $1
 	echo "${G_CC_F}	done" >> $1
 	echo "${G_CC_F}else" >> $1
 	echo "${G_CC_F}	echo \"cd \$SVN_REPO_DIR  and exec svn info error!!!\"" >> $1
@@ -222,7 +220,7 @@ gen_git_commitid_list()
 ## 注释到 git_commitid_list
 gen_common_git_commitid_list()
 {
-	echo "${G_CC_F}sed -i -e '24,42 s/^/#/' -e '$ s/^/#/' \$GIT2SVN_TOP/\$BR_DIR/patch_all.sh" >> $1
+	echo "${G_CC_F}sed -i -e '24,40 s/^/#/' -e '$ s/^/#/' \$GIT2SVN_TOP/\$BR_DIR/patch_all.sh" >> $1
 }
 
 
