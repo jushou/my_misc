@@ -48,6 +48,9 @@ NOT_PULL=0
 SVN_CMD_FILE=svn_repo_sync_command.sh
 SVN_COMM_FILE=svn_commit_file
 GIT_SYNC_LOG_FOLDER=.sync_git_to_svn
+G_CHECK_COMMIT=1
+G_CC_F=""
+G_DEL=1
 
 ##获取commit作者 $1 表示commit_id
 git_repo_get_commitid_author()
@@ -87,20 +90,20 @@ git_repo_get_commitid_msg()
 ###生成shell函数 check_git_cmid_patch_to_svn 
 gen_check_git_cmd()
 {
-	echo "check_git_cmid_patch_to_svn()" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "{" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "	commit_id=$REV2" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "	curr_pwd=\`pwd\`" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "	cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "	svn_find=\`grep  -P \"git_commit_id:[0-9a-fA-F]{40}\" \$GIT2SVN_TOP/\$BR_DIR/git_commitid_list | grep \$commit_id | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "	if [ \$svn_find -ne 0 ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "		echo \"$REV2 patched to svn repository and skip\"" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "		echo \"$REV2\" > \$GIT2SVN_TOP/../$GIT_NAME/$GIT_SYNC_LOG_FOLDER/${BR_NAME}_latest_commit_id" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "		exit 0" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "	fi" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "	cd \$curr_pwd" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "}" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "check_git_cmid_patch_to_svn" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}check_git_cmid_patch_to_svn()" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}{" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}	commit_id=$REV2" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}	curr_pwd=\`pwd\`" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}	cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}	svn_find=\`grep  -P \"git_commit_id:[0-9a-fA-F]{40}\" \$GIT2SVN_TOP/\$BR_DIR/git_commitid_list | grep \$commit_id | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}	if [ \$svn_find -ne 0 ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}		echo \"$REV2 patched to svn repository and skip\"" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}		echo \"$REV2\" > \$GIT2SVN_TOP/../$GIT_NAME/$GIT_SYNC_LOG_FOLDER/${BR_NAME}_latest_commit_id" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}		exit 0" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}	fi" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}	cd \$curr_pwd" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}}" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "${G_CC_F}check_git_cmid_patch_to_svn" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo -ne "\n"  >> $PATCH_DIR/$SVN_CMD_FILE
 }
 
@@ -192,33 +195,33 @@ gen_find_top()
 gen_git_commitid_list()
 {
 	echo -ne "\n" >> $1
-	echo "SVN_REPO_DIR=\$GIT2SVN_TOP/../$SVN_NAME" >> $1
-	echo "curr=\`pwd\`" >> $1
-	echo "cd \$SVN_REPO_DIR" >> $1
-	echo "svn info > /dev/null" >> $1
-	echo "if [ \$? = 0 ]; then" >> $1
-	echo "	svn log | grep \"git_commit_id:\" > $2 & " >> $1
-	echo "	echo \"generate git_commitid_list please wait\" " >> $1
-	echo "	pre_gen_gcl_st=0" >> $1
-	echo "	curr_gen_gcl_st=\`expr \$pre_gen_gcl_st + 5\`" >> $1
-	echo "	while ((curr_gen_gcl_st!=pre_gen_gcl_st))" >> $1
-	echo "	do" >> $1
-	echo "		echo -n \".\"" >> $1
-	echo "		sleep 2" >> $1
-	echo "		pre_gen_gcl_st=\$curr_gen_gcl_st" >> $1
-	echo "		curr_gen_gcl_st=\`stat $2 -c %Y\`" >> $1
-	echo "	done" >> $1
-	echo "else" >> $1
-	echo "	echo \"cd \$SVN_REPO_DIR  and exec svn info error!!!\"" >> $1
-	echo "fi" >> $1
-	echo "cd \$curr" >> $1
+	echo "${G_CC_F}SVN_REPO_DIR=\$GIT2SVN_TOP/../$SVN_NAME" >> $1
+	echo "${G_CC_F}curr=\`pwd\`" >> $1
+	echo "${G_CC_F}cd \$SVN_REPO_DIR" >> $1
+	echo "${G_CC_F}svn info > /dev/null" >> $1
+	echo "${G_CC_F}if [ \$? = 0 ]; then" >> $1
+	echo "${G_CC_F}	svn log | grep \"git_commit_id:\" > $2 & " >> $1
+	echo "${G_CC_F}	echo \"generate git_commitid_list please wait\" " >> $1
+	echo "${G_CC_F}	pre_gen_gcl_st=0" >> $1
+	echo "${G_CC_F}	curr_gen_gcl_st=\`expr \$pre_gen_gcl_st + 5\`" >> $1
+	echo "${G_CC_F}	while ((curr_gen_gcl_st!=pre_gen_gcl_st))" >> $1
+	echo "${G_CC_F}	do" >> $1
+	echo "${G_CC_F}		echo -n \".\"" >> $1
+	echo "${G_CC_F}		sleep 2" >> $1
+	echo "${G_CC_F}		pre_gen_gcl_st=\$curr_gen_gcl_st" >> $1
+	echo "${G_CC_F}		curr_gen_gcl_st=\`stat $2 -c %Y\`" >> $1
+	echo "${G_CC_F}	done" >> $1
+	echo "${G_CC_F}else" >> $1
+	echo "${G_CC_F}	echo \"cd \$SVN_REPO_DIR  and exec svn info error!!!\"" >> $1
+	echo "${G_CC_F}fi" >> $1
+	echo "${G_CC_F}cd \$curr" >> $1
 	echo -ne "\n" >> $1
 }
 
 ## 注释到 git_commitid_list
 gen_common_git_commitid_list()
 {
-	echo "sed -i -e '24,42 s/^/#/' -e '$ s/^/#/' \$GIT2SVN_TOP/\$BR_DIR/patch_all.sh" >> $1
+	echo "${G_CC_F}sed -i -e '24,42 s/^/#/' -e '$ s/^/#/' \$GIT2SVN_TOP/\$BR_DIR/patch_all.sh" >> $1
 }
 
 
@@ -741,6 +744,8 @@ usage()
 	echo -e "\t$0 -b -g -s "
 	echo -e "\t-g git_repo_path_name \n\t-b git_branch_name \n\t-s svn_repo_path_name "
 	echo -e "\t-n not pull git and svn repo"
+	echo -e "\t-c Check if the SVN repository has synced git commmit(default=1, 0:not check)"
+	echo -e "\t-d delete git patchs after success sync (default=1, 0:not delete)"
 	echo -e "\tfor example: "
 	echo -e "\t\t$0 -b main -g git_repo -s svn_repo"
 	exit -1
@@ -751,7 +756,7 @@ if [ $# -eq 0 ]; then
 fi
 
 
-while getopts "g:s:b:n" OPT
+while getopts "g:s:b:c:d:n" OPT
 do
 	case $OPT in
 		b)
@@ -760,12 +765,20 @@ do
 		SVN_NAME=$OPTARG ;;
 		g)
 		GIT_NAME=$OPTARG ;;
+		c)
+		G_CHECK_COMMIT=$OPTARG ;;
+		d)
+		G_DEL=$OPTARG ;;
 		n)
 		NOT_PULL=1 ;;
 		?)
 		usage;;
 	esac
 done
+
+if [ $G_CHECK_COMMIT -eq 0 ]; then
+	G_CC_F="#"
+fi
 
 
 check_cmd dos2unix sed git
@@ -789,6 +802,8 @@ if [ $? -ne 0 ]; then
 	echo "An error occurred while executing the ${PATCH_DIR_DATE}/patch_all.sh "
 	exit -1
 else
-	rm  ${PATCH_DIR_DATE}/ -rf
+	if [ $G_DEL -eq 1 ]; then
+		rm  ${PATCH_DIR_DATE}/ -rf
+	fi
 	echo "git to svn success!!!"
 fi
