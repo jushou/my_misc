@@ -92,7 +92,7 @@ gen_check_git_cmd()
 	echo "	commit_id=$REV2" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "	curr_pwd=\`pwd\`" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "	cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "	svn_find=\`svn log  | grep  -P \"git_commit_id:[0-9a-fA-F]{40}\" | grep \$commit_id | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "	svn_find=\`grep  -P \"git_commit_id:[0-9a-fA-F]{40}\" \$GIT2SVN_TOP/\$BR_DIR/git_commitid_list | grep \$commit_id | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "	if [ \$svn_find -ne 0 ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "		echo \"$REV2 patched to svn repository and skip\"" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "		echo \"$REV2\" > \$GIT2SVN_TOP/../$GIT_NAME/$GIT_SYNC_LOG_FOLDER/${BR_NAME}_latest_commit_id" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -122,7 +122,7 @@ gen_pre_cmd_check()
 ### $3 第几if else 语句
 gen_pre_if_else()
 {
-	sed_pre=`expr $3 \* 8 + 22`
+	sed_pre=`expr $3 \* 8 + 44`
 	sed_next=`expr $sed_pre + 6`
 	echo "if [ \$? -ne 0 ]; then" >> $2
 	echo "	echo $1 " >> $2
@@ -184,6 +184,41 @@ gen_find_top()
 	echo "	exit -1" >> $1
 	echo "fi" >> $1
 	echo "BR_DIR=${GIT_NAME}_$BR_NAME/$BASE_PATCH_DIRNAME" >> $1
+}
+
+###生成 git_commitid_list 便于svn合并时候检查是否已经同步
+### $1 生成在哪个shell脚本中
+### $2 git_commit_list生成在那个文件中
+gen_git_commitid_list()
+{
+	echo -ne "\n" >> $1
+	echo "SVN_REPO_DIR=\$GIT2SVN_TOP/../$SVN_NAME" >> $1
+	echo "curr=\`pwd\`" >> $1
+	echo "cd \$SVN_REPO_DIR" >> $1
+	echo "svn info > /dev/null" >> $1
+	echo "if [ \$? = 0 ]; then" >> $1
+	echo "	svn log | grep \"git_commit_id:\" > $2 & " >> $1
+	echo "	echo \"generate git_commitid_list please wait\" " >> $1
+	echo "	pre_gen_gcl_st=0" >> $1
+	echo "	curr_gen_gcl_st=\`expr \$pre_gen_gcl_st + 5\`" >> $1
+	echo "	while ((curr_gen_gcl_st!=pre_gen_gcl_st))" >> $1
+	echo "	do" >> $1
+	echo "		echo -n \".\"" >> $1
+	echo "		sleep 2" >> $1
+	echo "		pre_gen_gcl_st=\$curr_gen_gcl_st" >> $1
+	echo "		curr_gen_gcl_st=\`stat $2 -c %Y\`" >> $1
+	echo "	done" >> $1
+	echo "else" >> $1
+	echo "	echo \"cd \$SVN_REPO_DIR  and exec svn info error!!!\"" >> $1
+	echo "fi" >> $1
+	echo "cd \$curr" >> $1
+	echo -ne "\n" >> $1
+}
+
+## 注释到 git_commitid_list
+gen_common_git_commitid_list()
+{
+	echo "sed -i -e '24,42 s/^/#/' -e '$ s/^/#/' \$GIT2SVN_TOP/\$BR_DIR/patch_all.sh" >> $1
 }
 
 
@@ -384,7 +419,6 @@ gen_patch()
 	echo "SVN_REPO_DIR=\$GIT2SVN_TOP/../$SVN_NAME" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "PATCH_DIR_MODIFIED=\$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/modified" >> $PATCH_DIR/$SVN_CMD_FILE
 	gen_check_git_cmd
-	#echo "cd $SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 	gen_svn_st_check $PATCH_DIR/$SVN_CMD_FILE
 	###清空svn空间 后 svn up 一下
@@ -549,6 +583,7 @@ main()
 		mkdir -p ${PATCH_DIR_DATE}
 		echo "#!/bin/bash" > ${PATCH_DIR_DATE}/patch_all.sh
 		gen_find_top ${PATCH_DIR_DATE}/patch_all.sh
+		gen_git_commitid_list ${PATCH_DIR_DATE}/patch_all.sh \$GIT2SVN_TOP/\$BR_DIR/git_commitid_list
 
 		n_hast=(`git log --format=%H -$lastest_n`)
 		gen_patch_index=0
@@ -561,6 +596,7 @@ main()
 			gen_patch ${n_hast[j-1]} ${n_hast[j-2]} $gen_patch_index
 			gen_patch_index=`expr $gen_patch_index + 1`
 		done
+		gen_common_git_commitid_list ${PATCH_DIR_DATE}/patch_all.sh
 	else
 		echo -e "$RED latest success commit id ($1) not find \n please check $LATEST_COMMIT_ID $PLAIN"
 		exit -1
