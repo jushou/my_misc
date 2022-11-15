@@ -826,6 +826,8 @@ if [ $? -ne 0 ]; then
 else
 	if [ $G_DEL -eq 1 ]; then
 		rm  ${PATCH_DIR_DATE}/ -rf
+		echo -en "git to svn success!!! \n The (${PATCH_DIR_DATE}) folder not deleted"
+	else
+		echo -en "git to svn success!!! \n The (${PATCH_DIR_DATE}) folder was automatically deleted"
 	fi
-	echo "git to svn success!!!"
 fi
