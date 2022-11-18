@@ -277,15 +277,22 @@ cp_file_rev()
 		echo "cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
 		gen_pre_cmd_check "\"exec cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
 	fi
+	###存在@符号的文件名 svn 操作时 需要在最后增加 @符号否则无法添加到svn仓库
+	exist_at=`echo $r_file | grep "@" | wc -l`
+	if [ $exist_at -ne 0 ]; then
+		exist_at="@"
+	else
+		exist_at=""
+	fi
 
 	####其它用户有可执行权限才向svn中增加可执行权限
 	exec_on=`expr $4 % 10`
 	exec_on_cmd=""
 
 	if [ $((exec_on & 1)) -eq 1 ]; then
-		exec_on_cmd="svn propset svn:executable on $r_file"
+		exec_on_cmd="svn propset svn:executable on ${r_file}${exist_at}"
 	else
-		exec_on_cmd="svn propdel svn:executable $r_file"
+		exec_on_cmd="svn propdel svn:executable ${r_file}${exist_at}"
 	fi
 
 	#### 针对文件的修改（A D M R）操作
@@ -295,7 +302,7 @@ cp_file_rev()
 		svn_d_cmd="$r_file"
 		echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 		if [ "$svn_d_cmd" != "" ]; then
-			echo "svn delete $svn_d_cmd" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "svn delete ${svn_d_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
 			gen_pre_cmd_check "exec svn delete $svn_d_cmd fail" $PATCH_DIR/$SVN_CMD_FILE
 		fi
 
@@ -362,11 +369,11 @@ cp_file_rev()
 			echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 
 			if [ "$svn_d_cmd" != "" ]; then
-				echo "svn delete $svn_d_cmd" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "svn delete ${svn_d_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
 				gen_pre_cmd_check "exec svn delete $svn_d_cmd fail" $PATCH_DIR/$SVN_CMD_FILE
 			fi
 			if [ "$svn_a_cmd" != "" ]; then
-				echo "svn add --parents $svn_a_cmd" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "svn add --parents ${svn_a_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
 				gen_pre_cmd_check "exec svn add --parents $svn_a_cmd fail" $PATCH_DIR/$SVN_CMD_FILE
 			fi
 			echo "$exec_on_cmd" >> $PATCH_DIR/$SVN_CMD_FILE
