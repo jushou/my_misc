@@ -246,7 +246,8 @@ check_cmd()
 
 # $1 is revision, $2 源文件, $3 新文件, $4 修改的文件权限
 # $5 文件的属性（增加：A  删除：D  修改：M  重命名：R  类型变更 T）
-# $6 是否有空格文件名
+# $6 是否有特殊文件名
+# $7 是否为链接文件
 cp_file_rev()
 {
 	cd $GIT_REPO_DIR
@@ -328,17 +329,27 @@ cp_file_rev()
 			if [ $6 -eq 0 ]; then
 				mkdir -p `dirname $PATCH_DIR_MODIFIED/$r_file`
 				mv -f $temp_file $PATCH_DIR_MODIFIED/$r_file
+				###链接文件处理
+				if [ $7 -eq 1 ]; then
+					cd `dirname $PATCH_DIR_MODIFIED/$r_file`
+					ln -sf `cat $PATCH_DIR_MODIFIED/$r_file` `basename $PATCH_DIR_MODIFIED/$r_file`
+					cd -
+				fi
 			else ##空格文件名特殊处理
 				r_file_full=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' -e 's/=/\\=/g' -e 's/;/\\;/g' | sed 's#[^/]*$##g'`
 				echo "mkdir -p $r_file_full " > /tmp/tmp_git2svn.sh
 				echo "exit \$?" >> /tmp/tmp_git2svn.sh
 				bash /tmp/tmp_git2svn.sh
 				if [ $? -ne 0 ]; then
-					echo -e "$RED mkdir -p \`dirname $PATCH_DIR_MODIFIED/$r_file fail"
+					echo -e "$RED mkdir -p \`dirname $PATCH_DIR_MODIFIED/$r_file\` fail"
 					rm /tmp/tmp_git2svn.sh
 					exit -1
 				fi
 				echo "mv -f $temp_file $PATCH_DIR_MODIFIED/$r_file" > /tmp/tmp_git2svn.sh
+				echo "if [ $7 -eq 1 ]; then" >> /tmp/tmp_git2svn.sh
+				echo "	cd \`dirname $PATCH_DIR_MODIFIED/$r_file\`" >> /tmp/tmp_git2svn.sh
+				echo "	ln -sf \`cat $PATCH_DIR_MODIFIED/$r_file\` \`basename $PATCH_DIR_MODIFIED/$r_file\`" >> /tmp/tmp_git2svn.sh
+				echo "fi" >> /tmp/tmp_git2svn.sh
 				echo "exit \$?" >> /tmp/tmp_git2svn.sh
 				bash /tmp/tmp_git2svn.sh
 				if [ $? -ne 0 ];then
@@ -504,8 +515,12 @@ gen_patch()
 				file_action=${file_actions[i]}
 				file_action=${file_action:0:1}
 				file_mode=${file_modes[i]}
+				is_link_file=0
+				if [ $file_mode -eq 120000 ]; then
+					is_link_file=1
+				fi
 				file_mode=${file_mode:1}
-				cp_file_rev $REV2 ${file_olds[i]} ${file_news[i]} $file_mode $file_action $special_char
+				cp_file_rev $REV2 ${file_olds[i]} ${file_news[i]} $file_mode $file_action $special_char $is_link_file
 			done
 		done
 	else
@@ -519,10 +534,14 @@ gen_patch()
 			file_old=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF>=2){print  $2} }' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'`
 			file_new=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF==3){print  $3} else {print $2}}' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'`
 			file_mode=`awk 'NR=="'$a_size_i'" {print $2}' $PATCH_DIR/all_raw.diff`
+			is_link_file=0
+			if [ $file_mode -eq 120000 ]; then
+				is_link_file=1
+			fi
 			file_action=`awk 'NR=="'$a_size_i'" {print $5}' $PATCH_DIR/all_raw.diff`
 			file_mode=${file_mode:1}
 			file_action=${file_action:0:1}
-			cp_file_rev $REV2 "$file_old" "$file_new" $file_mode $file_action $special_char
+			cp_file_rev $REV2 "$file_old" "$file_new" $file_mode $file_action $special_char $is_link_file
 		done
 	fi
 	rm $PATCH_DIR/all_raw_* -rf
