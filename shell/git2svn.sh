@@ -51,6 +51,7 @@ GIT_SYNC_LOG_FOLDER=.sync_git_to_svn
 G_CHECK_COMMIT=1
 G_CC_F=""
 G_DEL=1
+G_GIT_URL=""
 
 ##获取commit作者 $1 表示commit_id
 git_repo_get_commitid_author()
@@ -78,12 +79,21 @@ git_repo_get_commitid_msg()
 {
 	curr_pwd=`pwd`
 	cd $GIT_REPO_DIR
-	echo -en "\t" >> $2
 	git log --pretty=format:"%s" -1 $1 >> $2
-	echo -en "\t" >> $2
 	git log --pretty=format:"%b" -1 $1  >> $2
 	echo -en "\tgit_commit_id:$1" >> $2
+	echo -en "\n\tgit_url=$G_GIT_URL branch=$BR_NAME"  >> $2
 	cd $curr_pwd
+}
+
+##获取git 仓库的url
+git_repo_get_url()
+{
+	curr_pwd=`pwd`
+	cd $GIT_REPO_DIR
+	cur_git_url=`git config remote.origin.url | awk -F "@" '{if(NF>=2){print $2}else{print $1}}'`
+	cd $curr_pwd
+	echo $cur_git_url
 }
 
 
@@ -726,6 +736,12 @@ init()
 		fi
 	fi
 
+	G_GIT_URL=`git_repo_get_url`
+	if [ "#$G_GIT_URL" == "#" ]; then
+		echo -e "$RED git_repo_get_url error $PLAIN"
+		exit -1
+	fi
+
 }
 
 
@@ -850,6 +866,8 @@ if [ $? -ne 0 ]; then
 	echo "An error occurred while executing the ${PATCH_DIR_DATE}/patch_all.sh "
 	exit -1
 else
+	###最后up一下 svn仓库
+	svn_update_repo
 	if [ $G_DEL -eq 1 ]; then
 		rm  ${PATCH_DIR_DATE}/ -rf
 		echo -en "git to svn success!!! \n The (${PATCH_DIR_DATE}) folder was automatically deleted\n"
