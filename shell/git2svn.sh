@@ -484,12 +484,11 @@ gen_patch()
 	chmod +x $PATCH_DIR/$SVN_CMD_FILE
 
 	mv -f $TMP_FILE all_raw.diff
-	cp all_raw.diff all_raw.diff.bak
-
 
 	####特殊字符检测
 	special_char=`awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep "[ ()&;=]" | wc -l`
 	if [ $special_char -ne 0 ]; then
+		cp all_raw.diff all_raw.diff.bak
 		awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep -n "[ ()&;=]" | awk -F ":" '{print $1}' > $PATCH_DIR/all_raw_space_lines
 		special_lines=`cat $PATCH_DIR/all_raw_space_lines`
 		### 存在特殊字符的行全部转移到 $PATCH_DIR/all_raw_special_char.diff 中
