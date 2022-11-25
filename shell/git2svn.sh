@@ -300,7 +300,7 @@ cp_file_rev()
 	exec_on=`expr $4 % 10`
 	exec_on_cmd=""
 
-	if [ $((exec_on & 1)) -eq 1 ]; then
+	if [ $((exec_on & 1)) -eq 1 -o $7 -eq 1 ]; then
 		exec_on_cmd="svn propset svn:executable on ${r_file}${exist_at}"
 	else
 		exec_on_cmd="svn propdel svn:executable ${r_file}${exist_at}"
@@ -484,71 +484,90 @@ gen_patch()
 	chmod +x $PATCH_DIR/$SVN_CMD_FILE
 
 	mv -f $TMP_FILE all_raw.diff
+	cp all_raw.diff all_raw.diff.bak
 
 
 	####特殊字符检测
-	#special_char=`awk '{{if(NF>4){print 1} else {print 0}}}' all_raw.diff`
-	special_char=`awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep " " | wc -l`
-	if [ $special_char -eq 0 ]; then
-		special_char=`grep "[()&;=]" all_raw.diff | wc -l`
+	special_char=`awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep "[ ()&;=]" | wc -l`
+	if [ $special_char -ne 0 ]; then
+		awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep -n "[ ()&;=]" | awk -F ":" '{print $1}' > $PATCH_DIR/all_raw_space_lines
+		special_lines=`cat $PATCH_DIR/all_raw_space_lines`
+		### 存在特殊字符的行全部转移到 $PATCH_DIR/all_raw_special_char.diff 中
+		touch $PATCH_DIR/all_raw_special_char.diff
+		for s_line in  ${special_lines[@]}
+		do
+			awk 'NR=="'$s_line'" {print $0}' $PATCH_DIR/all_raw.diff >> $PATCH_DIR/all_raw_special_char.diff
+		done
+		### 这里使用 sort -n -r 倒序排列 存在特殊字符的行号
+		### 然后使用sed -i 删除存在特殊字符的行
+		sort -n -r $PATCH_DIR/all_raw_space_lines > $PATCH_DIR/all_raw_space_lines.r
+		special_lines=`cat $PATCH_DIR/all_raw_space_lines.r`
+		for s_line in  ${special_lines[@]}
+		do
+			sed -i "${s_line}d"  $PATCH_DIR/all_raw.diff
+		done
+		rm -f $PATCH_DIR/all_raw_space_lines
+		rm -f $PATCH_DIR/all_raw_space_lines.r
 	fi
 
-	if [ $special_char -eq 0 ]; then
+
 	##这里将all_raw.diff按照个文件10000行的方式分割
 	##一个很大的提交差异全部保存在shell数组中会出现溢出的情况
-		page_ard_size=10000
-		ard_len=`cat all_raw.diff | wc -l`
-		page_ard_len=`expr $ard_len / $page_ard_size`
-		if [ `expr $ard_len % $page_ard_size` -ne 0 ]; then
-			page_ard_len=`expr $page_ard_len + 1`
-		fi
-		if [ $page_ard_len -eq 1 ]; then
-			cp all_raw.diff all_raw_0
-		fi
-		for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
+	page_ard_size=10000
+	ard_len=`cat all_raw.diff | wc -l`
+	page_ard_len=`expr $ard_len / $page_ard_size`
+	if [ `expr $ard_len % $page_ard_size` -ne 0 ]; then
+		page_ard_len=`expr $page_ard_len + 1`
+	fi
+	if [ $page_ard_len -eq 1 ]; then
+		cp all_raw.diff all_raw_0
+	fi
+	for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
+	do
+		start_line=`expr $ardp_i \* $page_ard_size + 1`
+		end_line=`expr $ardp_i \* $page_ard_size + $page_ard_size`
+		sed -n "$start_line , $end_line p" $PATCH_DIR/all_raw.diff > $PATCH_DIR/all_raw_$ardp_i
+	done
+	for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
+	do
+		file_modes=(`awk '{print $2}' $PATCH_DIR/all_raw_$ardp_i`)
+		file_actions=(`awk '{print $5}' $PATCH_DIR/all_raw_$ardp_i`)
+		file_olds=(`awk '{print $6}' $PATCH_DIR/all_raw_$ardp_i`)
+		file_news=(`awk '{if(NF==7){print $7} else {print $6}}' $PATCH_DIR/all_raw_$ardp_i`)
+		for((i=0;i<${#file_olds[@]};i++ ))
 		do
-			start_line=`expr $ardp_i \* $page_ard_size + 1`
-			end_line=`expr $ardp_i \* $page_ard_size + $page_ard_size`
-			sed -n "$start_line , $end_line p" $PATCH_DIR/all_raw.diff > $PATCH_DIR/all_raw_$ardp_i
+			if [ `expr $i % 100` -eq 0 ]; then
+				echo -n "."
+			fi
+			file_action=${file_actions[i]}
+			file_action=${file_action:0:1}
+			file_mode=${file_modes[i]}
+			is_link_file=0
+			if [ $file_mode -eq 120000 ]; then
+				is_link_file=1
+			fi
+			file_mode=${file_mode:1}
+			cp_file_rev $REV2 ${file_olds[i]} ${file_news[i]} $file_mode $file_action $special_char $is_link_file
 		done
-		for((ardp_i=0;ardp_i<$page_ard_len;ardp_i++))
-		do
-			file_modes=(`awk '{print $2}' $PATCH_DIR/all_raw_$ardp_i`)
-			file_actions=(`awk '{print $5}' $PATCH_DIR/all_raw_$ardp_i`)
-			file_olds=(`awk '{print $6}' $PATCH_DIR/all_raw_$ardp_i`)
-			file_news=(`awk '{if(NF==7){print $7} else {print $6}}' $PATCH_DIR/all_raw_$ardp_i`)
-			for((i=0;i<${#file_olds[@]};i++ ))
-			do
-				if [ `expr $i % 100` -eq 0 ]; then
-					echo -n "."
-				fi
-				file_action=${file_actions[i]}
-				file_action=${file_action:0:1}
-				file_mode=${file_modes[i]}
-				is_link_file=0
-				if [ $file_mode -eq 120000 ]; then
-					is_link_file=1
-				fi
-				file_mode=${file_mode:1}
-				cp_file_rev $REV2 ${file_olds[i]} ${file_news[i]} $file_mode $file_action $special_char $is_link_file
-			done
-		done
-	else
-		echo -e "$BLUE special file name was detected at $REV2 $PLAIN"
-		all_size=`cat all_raw.diff | wc -l`
+	done
+
+	#### 特殊字符文件名 在这里处理
+	if [ $special_char -ne 0 ]; then
+		echo -e "$BLUE \n special file name was detected at $REV2 $PLAIN"
+		all_size=`cat $PATCH_DIR/all_raw_special_char.diff | wc -l`
 		for((a_size_i=1;a_size_i<=$all_size;a_size_i++))
 		do
 			if [ `expr $a_size_i % 100` -eq 0 ]; then
 				echo -n "."
 			fi
-			file_old=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF>=2){print  $2} }' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'`
-			file_new=`awk  -F "\t" 'NR=="'$a_size_i'" {if(NF==3){print  $3} else {print $2}}' $PATCH_DIR/all_raw.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'`
-			file_mode=`awk 'NR=="'$a_size_i'" {print $2}' $PATCH_DIR/all_raw.diff`
+			file_old=`awk -F "\t" 'NR=="'$a_size_i'" {if(NF>=2){print  $2} }' $PATCH_DIR/all_raw_special_char.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'`
+			file_new=`awk -F "\t" 'NR=="'$a_size_i'" {if(NF==3){print  $3} else {print $2}}' $PATCH_DIR/all_raw_special_char.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'`
+			file_mode=`awk 'NR=="'$a_size_i'" {print $2}' $PATCH_DIR/all_raw_special_char.diff`
 			is_link_file=0
 			if [ $file_mode -eq 120000 ]; then
 				is_link_file=1
 			fi
-			file_action=`awk 'NR=="'$a_size_i'" {print $5}' $PATCH_DIR/all_raw.diff`
+			file_action=`awk 'NR=="'$a_size_i'" {print $5}' $PATCH_DIR/all_raw_special_char.diff`
 			file_mode=${file_mode:1}
 			file_action=${file_action:0:1}
 			cp_file_rev $REV2 "$file_old" "$file_new" $file_mode $file_action $special_char $is_link_file
@@ -565,7 +584,7 @@ gen_patch()
 	mv $PATCH_DIR/temp_folder $PATCH_DIR/pending_folder
 
 	###特殊字符检测
-	special_char=`grep "[ ()&=;]" $PATCH_DIR/pending_folder | wc -l`
+	special_char=`grep "[ ()&;=]" $PATCH_DIR/pending_folder | wc -l`
 	space_folder_line=(`cat $PATCH_DIR/pending_folder | wc -l`)
 	###处理可能需要删除的文件夹
 	if [ $special_char -eq 0 ]; then
