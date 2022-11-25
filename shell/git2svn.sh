@@ -53,25 +53,6 @@ G_CC_F=""
 G_DEL=1
 G_GIT_URL=""
 
-##获取commit作者 $1 表示commit_id
-git_repo_get_commitid_author()
-{
-	curr_pwd=`pwd`
-	cd $GIT_REPO_DIR
-	sub_author=`git log --pretty=format:"%an" -1 $1`
-	cd $curr_pwd
-	echo $sub_author
-}
-
-##获取commit日期  $1 表示commit_id
-git_repo_get_commitid_date()
-{
-	curr_pwd=`pwd`
-	cd $GIT_REPO_DIR
-	sub_date=`git log --pretty=format:"%ad" --date=iso -1 $1`
-	cd $curr_pwd
-	echo $sub_date
-}
 
 ##获取commit 提交的信息  $1 表示commit_id
 ##$2 表示追加的文件
@@ -79,10 +60,9 @@ git_repo_get_commitid_msg()
 {
 	curr_pwd=`pwd`
 	cd $GIT_REPO_DIR
-	git log --pretty=format:"%s" -1 $1 >> $2
-	git log --pretty=format:"%b" -1 $1  >> $2
-	echo -en "\tgit_commit_id:$1" >> $2
-	echo -en "\n\tgit_url=$G_GIT_URL branch=$BR_NAME"  >> $2
+	git log -1 $1 | sed -n '2,$p' > $2
+	echo -en "\n    git_commit_id:$1" >> $2
+	echo -en "\n    git_url=$G_GIT_URL branch=$BR_NAME"  >> $2
 	cd $curr_pwd
 }
 
@@ -592,7 +572,6 @@ gen_patch()
 	rm $PATCH_DIR/all_raw_* -rf
 
 	###生成svn补丁脚本(提交信息 提交命令等)
-	echo "[`git_repo_get_commitid_author $REV2`] [`git_repo_get_commitid_date $REV2`]" > $PATCH_DIR/$SVN_COMM_FILE
 	git_repo_get_commitid_msg $REV2 $PATCH_DIR/$SVN_COMM_FILE
 	dos2unix $PATCH_DIR/$SVN_COMM_FILE &> /dev/null
 
