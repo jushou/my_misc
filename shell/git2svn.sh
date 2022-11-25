@@ -129,6 +129,23 @@ gen_pre_cmd_check()
 	echo -ne "\n"  >> $2
 }
 
+
+#### svn 提交的时候输出 commit 信息
+### $1 提示语（注意 提示语中有空格则需要用双引号包裹）  
+### $2 生成在哪个shell脚本中
+### $3 svn commit 文件
+gen_svn_commmit_info()
+{
+	echo "if [ \$? -ne 0 ]; then" >> $2
+	echo "	echo $1 " >> $2
+	echo "	exit -1" >> $2
+	echo "else" >> $2
+	echo "	echo -e \"current commit info:\n \`cat $3 \` \n\n\"" >> $2
+	echo "fi" >> $2
+	echo -ne "\n"  >> $2
+}
+
+
 ##执行成功就注释掉if else 语句
 ### $1 提示语（注意 提示语中有空格则需要用双引号包裹）  
 ### $2 生成在哪个shell脚本中
@@ -635,7 +652,7 @@ gen_patch()
 	echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "svn commit -F \$PATCH_DIR_MODIFIED/../$SVN_COMM_FILE " >> $PATCH_DIR/$SVN_CMD_FILE
 	###生成判断函数 上条命令是否执行成功
-	gen_pre_cmd_check "\"svn commit -F \$PATCH_DIR_MODIFIED/../$SVN_COMM_FILE fail\"" $PATCH_DIR/$SVN_CMD_FILE
+	gen_svn_commmit_info "\"svn commit -F \$PATCH_DIR_MODIFIED/../$SVN_COMM_FILE fail\"" $PATCH_DIR/$SVN_CMD_FILE "\$PATCH_DIR_MODIFIED/../$SVN_COMM_FILE"
 	echo "echo \"$REV2\" > \$GIT2SVN_TOP/../$GIT_NAME/$GIT_SYNC_LOG_FOLDER/${BR_NAME}_latest_commit_id" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "$REV2 success git show to $PATCH_DIR"
 }
