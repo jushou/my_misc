@@ -77,7 +77,7 @@ git_repo_get_url()
 }
 
 
-###生成shell函数 check_git_cmid_patch_to_svn 
+###生成shell函数 check_git_cmid_patch_to_svn
 gen_check_git_cmd()
 {
 	echo "${G_CC_F}check_git_cmid_patch_to_svn()" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -98,7 +98,7 @@ gen_check_git_cmd()
 }
 
 ####生成shell 判断语句 判断前一条命令是否执行成功
-### $1 提示语（注意 提示语中有空格则需要用双引号包裹）  
+### $1 提示语（注意 提示语中有空格则需要用双引号包裹）
 ### $2 生成在哪个shell脚本中
 gen_pre_cmd_check()
 {
@@ -111,7 +111,7 @@ gen_pre_cmd_check()
 
 
 #### svn 提交的时候输出 commit 信息
-### $1 提示语（注意 提示语中有空格则需要用双引号包裹）  
+### $1 提示语（注意 提示语中有空格则需要用双引号包裹）
 ### $2 生成在哪个shell脚本中
 ### $3 svn commit 文件
 gen_svn_commmit_info()
@@ -127,7 +127,7 @@ gen_svn_commmit_info()
 
 
 ##执行成功就注释掉if else 语句
-### $1 提示语（注意 提示语中有空格则需要用双引号包裹）  
+### $1 提示语（注意 提示语中有空格则需要用双引号包裹）
 ### $2 生成在哪个shell脚本中
 ### $3 第几if else 语句
 ### $4 注释哪个文件
@@ -248,7 +248,6 @@ check_cmd()
 			exit 1
 		fi
 	done
-	
 }
 
 # $1 is revision, $2 源文件, $3 新文件, $4 修改的文件权限
@@ -305,7 +304,7 @@ cp_file_rev()
 
 	#### 针对文件的修改（A D M R）操作
 	if [ "#$5" == "#D" ]; then
-		rm -f $temp_file 
+		rm -f $temp_file
 		echo "rm \$SVN_REPO_DIR/$r_file -rf" >> $PATCH_DIR/$SVN_CMD_FILE
 		svn_d_cmd="$r_file"
 		echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -468,7 +467,7 @@ gen_patch()
 	gen_svn_st_check $PATCH_DIR/$SVN_CMD_FILE
 	###清空svn空间 后 svn up 一下
 	echo "svn up " >> $PATCH_DIR/$SVN_CMD_FILE
-	
+
 	###svn补丁脚本加入总的执行脚本中
 	echo "\$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/$SVN_CMD_FILE" >> ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh
 	gen_pre_if_else "\"exec  \$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/$SVN_CMD_FILE  fail\"" ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh $arg3 \$GIT2SVN_TOP/\$BR_DIR/$base3/patch_all_$base3.sh
@@ -575,53 +574,87 @@ gen_patch()
 	git_repo_get_commitid_msg $REV2 $PATCH_DIR/$SVN_COMM_FILE
 	dos2unix $PATCH_DIR/$SVN_COMM_FILE &> /dev/null
 
+
+	### 开始处理可能需要删除的文件夹
 	sort -u -r $PATCH_DIR/pending_folder > $PATCH_DIR/temp_folder
 	mv $PATCH_DIR/temp_folder $PATCH_DIR/pending_folder
 
 	###特殊字符检测
 	special_char=`grep "[ ()&;=]" $PATCH_DIR/pending_folder | wc -l`
+
+	### 这里将包含特殊文件的行转移到 pending_folder_special_char 中
+	if [ $special_char -ne 0 ]; then
+		cp $PATCH_DIR/pending_folder $PATCH_DIR/pending_folder.bak
+		grep -n "[ ()&;=]" $PATCH_DIR/pending_folder | awk -F ":" '{print $1}' > $PATCH_DIR/all_space_lines
+		special_lines=`cat $PATCH_DIR/all_space_lines`
+		### 存在特殊字符的行全部转移到 $PATCH_DIR/pending_folder_special_char 中
+		touch $PATCH_DIR/pending_folder_special_char
+		for s_line in  ${special_lines[@]}
+		do
+			awk 'NR=="'$s_line'" {print $0}' $PATCH_DIR/pending_folder >> $PATCH_DIR/pending_folder_special_char
+		done
+		### 这里使用 sort -n -r 倒序排列 存在特殊字符的行号
+		### 然后使用sed -i 删除存在特殊字符的行
+		sort -n -r $PATCH_DIR/all_space_lines > $PATCH_DIR/all_space_lines.r
+		special_lines=`cat $PATCH_DIR/all_space_lines.r`
+		for s_line in  ${special_lines[@]}
+		do
+			sed -i "${s_line}d"  $PATCH_DIR/pending_folder
+		done
+		rm -f $PATCH_DIR/all_space_lines
+		rm -f $PATCH_DIR/all_space_lines.r
+	fi
+
+
 	space_folder_line=(`cat $PATCH_DIR/pending_folder | wc -l`)
 	###处理可能需要删除的文件夹
-	if [ $special_char -eq 0 ]; then
-		page_sfl_size=5000
-		if [ $space_folder_line -ne 0 ]; then
-			sfl_page_len=`expr $space_folder_line / $page_sfl_size`
-			if [ `expr $space_folder_line % $page_sfl_size` -ne 0 ]; then
-				sfl_page_len=`expr $sfl_page_len + 1`
-			fi
-			echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
-			for((sflp_i=0;sflp_i<$sfl_page_len;sflp_i++))
-			do
-				start_line=`expr $sflp_i \* $page_sfl_size + 1`
-				end_line=`expr $sflp_i \* $page_sfl_size + $page_sfl_size`
-				array_peding=(`sed -n "$start_line , $end_line p" $PATCH_DIR/pending_folder`)
-				for ap in ${array_peding[@]}
-				do
-					echo "tmp_ar=$ap" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "if [ ! -d \$tmp_ar ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "	svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "else" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "	while [ \"#\`ls -A \$tmp_ar\`\" == \"#\" ]" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "		svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "		tmp_ar=\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g' | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
-					echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
-				done
-			done
+	page_sfl_size=5000
+	if [ $space_folder_line -ne 0 ]; then
+		sfl_page_len=`expr $space_folder_line / $page_sfl_size`
+		if [ `expr $space_folder_line % $page_sfl_size` -ne 0 ]; then
+			sfl_page_len=`expr $sfl_page_len + 1`
 		fi
-	else ###文件名中有特殊字符的处理
+		echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
+		for((sflp_i=0;sflp_i<$sfl_page_len;sflp_i++))
+		do
+			start_line=`expr $sflp_i \* $page_sfl_size + 1`
+			end_line=`expr $sflp_i \* $page_sfl_size + $page_sfl_size`
+			array_peding=(`sed -n "$start_line , $end_line p" $PATCH_DIR/pending_folder`)
+			for ap in ${array_peding[@]}
+			do
+				echo "tmp_ar=$ap" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "if [ ! -d \$tmp_ar ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "	svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "else" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "	while [ \"#\`ls -A \$tmp_ar\`\" == \"#\" ]" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "		svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "		tmp_ar=\`echo \$tmp_ar | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
+			done
+		done
+	fi
+	 ###文件名中有特殊字符的处理
+	if [ $special_char -ne 0 ]; then
+		space_folder_line=(`cat $PATCH_DIR/pending_folder_special_char | wc -l`)
 		for((sp_ap_i=1;sp_ap_i<=$space_folder_line;sp_ap_i++))
 		do
-			ap=`sed -n "${sp_ap_i}p" $PATCH_DIR/pending_folder`
+			ap=`sed -n "${sp_ap_i}p" $PATCH_DIR/pending_folder_special_char`
 			echo "tmp_ar=$ap" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "if [ ! -d \$tmp_ar ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "	svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "if [ ! -d \"\$tmp_ar\" ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "	svn delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "else" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "	while [ \"#\`ls -A \$tmp_ar\`\" == \"#\" ]" >> $PATCH_DIR/$SVN_CMD_FILE
+			#### 这里需要处理特殊的文件夹
+			echo "	find_tmp_ar=\"\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g'\`\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "	fwl=\`find \"\$find_tmp_ar\" | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "	while [ \$fwl -eq 1 ]" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "		svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "		tmp_ar=\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g' | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "		svn delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "		tmp_ar=\`echo \"\$tmp_ar\" | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "		if [ \"#\$tmp_ar\" == \"#\" ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "			break" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "		fi" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
 		done
