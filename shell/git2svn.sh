@@ -370,14 +370,9 @@ cp_file_rev()
 			echo "cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
 			gen_pre_cmd_check "\"exec cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
 			if [ "#$5" == "#A" ]; then
-				# array_add[${#array_add[*]}]=$r_file
 				svn_a_cmd="$r_file"
-			elif [ "#$5" == "#M" -o "#$5" == "#T" ]; then
-				###nothing to do
-				echo -n ""
-			elif [ "#$5" == "#R" ]; then
-				echo "at $1 $2 rename to $3"
-			else
+			fi
+			if [ "#$5" != "#A" -a "#$5" != "#M" -a "#$5" != "#D" -a "#$5" != "#R" -a "#$5" != "#T" ]; then
 				echo -en "$RED $1:$r_file change_type unknow (A M D R T) change_type=$5 $PLAIN"
 				exit -1
 			fi
