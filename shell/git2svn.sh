@@ -52,7 +52,27 @@ G_CHECK_COMMIT=1
 G_CC_F=""
 G_DEL=1
 G_GIT_URL=""
+G_SVN_CM_TYPE=0
 
+##获取commit作者 $1 表示commit_id
+git_repo_get_commitid_author()
+{
+	curr_pwd=`pwd`
+	cd $GIT_REPO_DIR
+	sub_author=`git log --pretty=format:"%an" -1 $1`
+	cd $curr_pwd
+	echo $sub_author
+}
+
+##获取commit日期  $1 表示commit_id
+git_repo_get_commitid_date()
+{
+	curr_pwd=`pwd`
+	cd $GIT_REPO_DIR
+	sub_date=`git log --pretty=format:"%ad" --date=iso -1 $1`
+	cd $curr_pwd
+	echo $sub_date
+}
 
 ##获取commit 提交的信息  $1 表示commit_id
 ##$2 表示追加的文件
@@ -60,8 +80,22 @@ git_repo_get_commitid_msg()
 {
 	curr_pwd=`pwd`
 	cd $GIT_REPO_DIR
+	git log --pretty=format:"%s" -1 $1 >> $2
+	echo -en "\n\n    " >> $2
+	git log --pretty=format:"%b" -1 $1  >> $2
+	echo -en "    git_commit_id:$1" >> $2
+	echo -en "\n    git_url=$G_GIT_URL branch=$BR_NAME"  >> $2
+	cd $curr_pwd
+}
+
+##获取commit 提交的信息  $1 表示commit_id
+##$2 表示追加的文件
+git_repo_get_commitid_msg2()
+{
+	curr_pwd=`pwd`
+	cd $GIT_REPO_DIR
 	git log -1 $1 | sed -n '2,$p' > $2
-	echo -en "\n    git_commit_id:$1" >> $2
+	echo -en "    git_commit_id:$1" >> $2
 	echo -en "\n    git_url=$G_GIT_URL branch=$BR_NAME"  >> $2
 	cd $curr_pwd
 }
@@ -377,7 +411,9 @@ cp_file_rev()
 				exit -1
 			fi
 			###文件权限管理
-			echo "chmod $4 \$SVN_REPO_DIR/$r_file" >> $PATCH_DIR/$SVN_CMD_FILE
+			if [ $7 -ne 1 ]; then
+				echo "chmod $4 \$SVN_REPO_DIR/$r_file" >> $PATCH_DIR/$SVN_CMD_FILE
+			fi
 			echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 
 			if [ "$svn_d_cmd" != "" ]; then
@@ -566,7 +602,12 @@ gen_patch()
 	rm $PATCH_DIR/all_raw_* -rf
 
 	###生成svn补丁脚本(提交信息 提交命令等)
-	git_repo_get_commitid_msg $REV2 $PATCH_DIR/$SVN_COMM_FILE
+	if [ $G_SVN_CM_TYPE -eq 0 ]; then
+		echo "[`git_repo_get_commitid_author $REV2`] [`git_repo_get_commitid_date $REV2`]" > $PATCH_DIR/$SVN_COMM_FILE
+		git_repo_get_commitid_msg $REV2 $PATCH_DIR/$SVN_COMM_FILE
+	else
+		git_repo_get_commitid_msg $REV2 $PATCH_DIR/$SVN_COMM_FILE
+	fi
 	dos2unix $PATCH_DIR/$SVN_COMM_FILE &> /dev/null
 
 
@@ -852,6 +893,7 @@ usage()
 	echo -e "\t-n not pull git and svn repo"
 	echo -e "\t-c Check if the SVN repository has synced git commmit(default=1, 0:not check)"
 	echo -e "\t-d delete git patchs after success sync (default=1, 0:not delete)"
+	echo -e "\t-m svn commit message type (default=0,(one line message); 1,(multi line message))"
 	echo -e "\tfor example: "
 	echo -e "\t\t$0 -b main -g git_repo -s svn_repo"
 	exit -1
@@ -862,7 +904,7 @@ if [ $# -eq 0 ]; then
 fi
 
 
-while getopts "g:s:b:c:d:n" OPT
+while getopts "g:s:b:c:d:m:n" OPT
 do
 	case $OPT in
 		b)
@@ -877,6 +919,8 @@ do
 		G_DEL=$OPTARG ;;
 		n)
 		NOT_PULL=1 ;;
+		m)
+		G_SVN_CM_TYPE=$OPTARG ;;
 		?)
 		usage;;
 	esac
