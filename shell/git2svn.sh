@@ -606,7 +606,7 @@ gen_patch()
 		echo "[`git_repo_get_commitid_author $REV2`] [`git_repo_get_commitid_date $REV2`]" > $PATCH_DIR/$SVN_COMM_FILE
 		git_repo_get_commitid_msg $REV2 $PATCH_DIR/$SVN_COMM_FILE
 	else
-		git_repo_get_commitid_msg $REV2 $PATCH_DIR/$SVN_COMM_FILE
+		git_repo_get_commitid_msg2 $REV2 $PATCH_DIR/$SVN_COMM_FILE
 	fi
 	dos2unix $PATCH_DIR/$SVN_COMM_FILE &> /dev/null
 
