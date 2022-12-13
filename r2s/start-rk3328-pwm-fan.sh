@@ -42,13 +42,13 @@ do
     FOUNDTEMP=0
     DUTY=$DefaultDuty
     PERCENT=$DefaultPercents
-    
+
     for i in 0 1 2 3; do
         if [ $temp -gt ${CpuTemps[$i]} ]; then
             INDEX=$i
             FOUNDTEMP=1
             break
-        fi    
+        fi
     done
     if [ ${FOUNDTEMP} == 1 ]; then
         DUTY=${PwmDutyCycles[$i]}
