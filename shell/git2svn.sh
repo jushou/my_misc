@@ -270,6 +270,18 @@ gen_common_patch_all_x_pre()
 	echo "sed -i -e '2,21 s/^/#/' -e '$ s/^/#/' $1" >> $2
 }
 
+###将windwos下的回车换行转为换行
+CR_LR_2_LR()
+{
+	file_type=`file -bi $1 | grep "charset=binary"`
+	if [ "#$file_type" == "#" ]; then
+		crlf_file=$1
+		echo "cflf_flag" >> $crlf_file
+		sed -i ':a ; N;s/\r\n/\n/ ; t a ; ' $crlf_file
+		sed -i '$d' $crlf_file
+	fi
+}
+
 
 ###检测命令是否存在 $1 需要检测的命令
 check_cmd()
@@ -608,7 +620,7 @@ gen_patch()
 	else
 		git_repo_get_commitid_msg2 $REV2 $PATCH_DIR/$SVN_COMM_FILE
 	fi
-	dos2unix $PATCH_DIR/$SVN_COMM_FILE &> /dev/null
+	CR_LR_2_LR $PATCH_DIR/$SVN_COMM_FILE
 
 
 	### 开始处理可能需要删除的文件夹
@@ -931,7 +943,7 @@ if [ $G_CHECK_COMMIT -eq 0 ]; then
 fi
 
 
-check_cmd dos2unix sed git
+check_cmd sed git
 
 #####
 check_svn_git_name
