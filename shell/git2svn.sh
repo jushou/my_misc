@@ -276,7 +276,7 @@ CR_LR_2_LR()
 	file_type=`file -bi $1 | grep "charset=binary"`
 	if [ "#$file_type" == "#" ]; then
 		crlf_file=$1
-		echo "cflf_flag" >> $crlf_file
+		echo -en "\ncflf_flag" >> $crlf_file
 		sed -i ':a ; N;s/\r\n/\n/ ; t a ; ' $crlf_file
 		sed -i '$d' $crlf_file
 	fi
