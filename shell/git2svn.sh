@@ -271,7 +271,7 @@ gen_common_patch_all_x_pre()
 }
 
 ###将windwos下的回车换行转为换行
-CR_LR_2_LR()
+CRLF_2_LF()
 {
 	file_type=`file -bi $1 | grep "charset=binary"`
 	if [ "#$file_type" == "#" ]; then
@@ -620,7 +620,7 @@ gen_patch()
 	else
 		git_repo_get_commitid_msg2 $REV2 $PATCH_DIR/$SVN_COMM_FILE
 	fi
-	CR_LR_2_LR $PATCH_DIR/$SVN_COMM_FILE
+	CRLF_2_LF $PATCH_DIR/$SVN_COMM_FILE
 
 
 	### 开始处理可能需要删除的文件夹

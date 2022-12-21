@@ -8,7 +8,7 @@ function __do_space_deal()
 	fi
 }
 
-function CR_LR_2_LR()
+function CRLF_2_LF()
 {
 	file_type=`file -bi $1 | grep "charset=binary"`
 	if [ "#$file_type" == "#" ]; then
@@ -23,14 +23,14 @@ function tail_space_deal()
 {
 	if [ -f $1 ]; then
 		__do_space_deal $1
-		CR_LR_2_LR $1
+		CRLF_2_LF $1
 	elif [ -d $1 ];then
 		dirs=(`ls $1`)
 		for el in  ${dirs[@]}
 		do
 			if [ -f $1/$el ]; then
 				__do_space_deal $1/$el
-				CR_LR_2_LR $1/$el
+				CRLF_2_LF $1/$el
 			elif [ -d $1/$el ]; then
 				tail_space_deal $1/$el
 			fi
