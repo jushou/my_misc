@@ -728,10 +728,10 @@ main()
 	fi
 	if [ "#$lastest_n" != "#" ]; then
 		if [ $lastest_n -eq 1 ]; then
-			echo "No commits to sync from git to svn"
+			echo "No commits will be synchronized to svn"
 			exit 0
 		else
-			echo "$lastest_n git commit finded"
+			echo "`expr $lastest_n - 1` commits will be synchronized to svn"
 			echo "Generating patch files, please wait"
 		fi
 
