@@ -853,6 +853,7 @@ git_check_br()
 		exit -1
 	fi
 	if [ "$curr_br" != "$BR_NAME" ];then
+		echo " git switch to $BR_NAME ing ... please wait"
 		git checkout $BR_NAME
 		if [ $? -ne 0 ]; then
 			echo -e "$RED\n git checkout $BR_NAME error \n$PLAIN"
@@ -948,8 +949,9 @@ check_cmd sed git
 #####
 check_svn_git_name
 init
-update_svn_git
 git_check_br
+update_svn_git
+
 
 ##主函数
 main $COMMIT_HASH
