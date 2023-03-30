@@ -402,7 +402,7 @@ cp_file_rev()
 					rm $tmp_git2svn
 					exit -1
 				fi
-				echo "mv -f $temp_file $modified_r_file" > $tmp_git2svn
+				echo "mv -f $temp_file $PATCH_DIR_MODIFIED/$r_file" > $tmp_git2svn
 				echo "if [ $7 -eq 1 ]; then" >> $tmp_git2svn
 				echo "	cd \`dirname $ln_sf_r_file\`" >> $tmp_git2svn
 				echo "	ln -sf \`cat $modified_r_file\` \`basename $ln_sf_r_file\`" >> $tmp_git2svn
