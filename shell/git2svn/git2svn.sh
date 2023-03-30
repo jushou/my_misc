@@ -329,7 +329,7 @@ cp_file_rev()
 		echo "$r_dirname_org" >> $PATCH_DIR/pending_folder
 
 		echo "mkdir -p \$SVN_REPO_DIR/$r_dirname_new 2>/dev/null" >> $PATCH_DIR/$SVN_CMD_FILE
-		echo "cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
+		echo "cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf " >> $PATCH_DIR/$SVN_CMD_FILE
 		gen_pre_cmd_check "\"exec cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
 	fi
 	###存在@符号的文件名 svn 操作时 需要在最后增加 @符号否则无法添加到svn仓库
@@ -350,7 +350,7 @@ cp_file_rev()
 		exec_on_cmd="svn propdel svn:executable ${r_file}${exist_at}"
 	fi
 
-	#### 针对文件的修改（A D M R）操作
+	#### 针对文件的修改（A D M R T）操作
 	if [ "#$5" == "#D" ]; then
 		rm -f $temp_file
 		echo "rm \$SVN_REPO_DIR/$r_file -rf" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -417,9 +417,15 @@ cp_file_rev()
 				#rm $tmp_git2svn
 			fi
 			###生成svn补丁脚本
+			### 类型改变需要先删除然后再次添加
+			if [ "#$5" == "#T" ]; then
+				echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "svn delete $r_file${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
+				gen_pre_cmd_check "\"exec svn delete \$SVN_REPO_DIR/$r_file${exist_at} fail\"" $PATCH_DIR/$SVN_CMD_FILE
+			fi
 			echo "mkdir -p \$SVN_REPO_DIR/$r_dirname_new 2>/dev/null" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf" >> $PATCH_DIR/$SVN_CMD_FILE
-			gen_pre_cmd_check "\"exec cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf fail\"" $PATCH_DIR/$SVN_CMD_FILE
+			echo "cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new -rf " >> $PATCH_DIR/$SVN_CMD_FILE
+			gen_pre_cmd_check "\"exec cp \$PATCH_DIR_MODIFIED/$r_file \$SVN_REPO_DIR/$r_dirname_new  fail\"" $PATCH_DIR/$SVN_CMD_FILE
 			if [ "#$5" == "#A" ]; then
 				svn_a_cmd="$r_file"
 			fi
@@ -432,6 +438,11 @@ cp_file_rev()
 				echo "chmod $4 \$SVN_REPO_DIR/$r_file" >> $PATCH_DIR/$SVN_CMD_FILE
 			fi
 			echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
+			##如果是类型改变 还需在这里添加
+			if [ "#$5" == "#T" ]; then
+				echo "svn add --parents $r_file${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
+				gen_pre_cmd_check "\"exec svn add --parents $r_file${exist_at}\"" $PATCH_DIR/$SVN_CMD_FILE
+			fi
 
 			if [ "$svn_d_cmd" != "" ]; then
 				echo "svn delete ${svn_d_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
