@@ -652,10 +652,12 @@ gen_patch()
 	###需要处理的特殊文件名
 	special_char=`grep "[ ()&;=']" $PATCH_DIR/pending_folder | wc -l`
 
+
 	### 这里将包含特殊文件的行转移到 pending_folder_special_char 中
 	if [ $special_char -ne 0 ]; then
 		cp $PATCH_DIR/pending_folder $PATCH_DIR/pending_folder.bak
-		grep -n "[ ()&;=]" $PATCH_DIR/pending_folder | awk -F ":" '{print $1}' > $PATCH_DIR/all_space_lines
+		###需要处理的特殊文件名
+		grep -n "[ ()&;=']" $PATCH_DIR/pending_folder | awk -F ":" '{print $1}' > $PATCH_DIR/all_space_lines
 		special_lines=`cat $PATCH_DIR/all_space_lines`
 		### 存在特殊字符的行全部转移到 $PATCH_DIR/pending_folder_special_char 中
 		touch $PATCH_DIR/pending_folder_special_char
@@ -674,7 +676,6 @@ gen_patch()
 		rm -f $PATCH_DIR/all_space_lines
 		rm -f $PATCH_DIR/all_space_lines.r
 	fi
-
 
 	space_folder_line=(`cat $PATCH_DIR/pending_folder | wc -l`)
 	###处理可能需要删除的文件夹
@@ -718,13 +719,15 @@ gen_patch()
 			#### 需要处理的特殊文件名
 			echo "	find_tmp_ar=\"\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g' -e \"s#'#\\\\'#g\" \`\"" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	fwl=\`find \"\$find_tmp_ar\" | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "	while [ \$fwl -eq 1 ]" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "	while [ \$? -eq 0 -a \$fwl -eq 1 ]" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "		svn delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "		tmp_ar=\`echo \"\$tmp_ar\" | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "		if [ \"#\$tmp_ar\" == \"#\" ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "			break" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "		fi" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "		find_tmp_ar=\"\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g' -e \"s#'#\\\\'#g\" \`\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "		fwl=\`find \"\$find_tmp_ar\" | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
 		done
