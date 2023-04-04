@@ -54,6 +54,10 @@ G_DEL=1
 G_GIT_URL=""
 G_SVN_CM_TYPE=0
 
+####需要处理的特殊文件名
+grep_special="\"[ ()&;=']\""
+
+
 ##获取commit作者 $1 表示commit_id
 git_repo_get_commitid_author()
 {
@@ -540,12 +544,10 @@ gen_patch()
 
 	mv -f $TMP_FILE all_raw.diff
 
-	####需要处理的特殊文件名
-	special_char=`awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep "[ ()&;=']" | wc -l`
+	special_char=`awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | eval grep $grep_special | wc -l`
 	if [ $special_char -ne 0 ]; then
 		cp all_raw.diff all_raw.diff.bak
-		####需要处理的特殊文件名
-		awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep -n "[ ()&;=']" | awk -F ":" '{print $1}' > $PATCH_DIR/all_raw_space_lines
+		awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | eval grep -n $grep_special | awk -F ":" '{print $1}' > $PATCH_DIR/all_raw_space_lines
 		special_lines=`cat $PATCH_DIR/all_raw_space_lines`
 		### 存在特殊字符的行全部转移到 $PATCH_DIR/all_raw_special_char.diff 中
 		touch $PATCH_DIR/all_raw_special_char.diff
@@ -649,15 +651,13 @@ gen_patch()
 	sort -u -r $PATCH_DIR/pending_folder > $PATCH_DIR/temp_folder
 	mv $PATCH_DIR/temp_folder $PATCH_DIR/pending_folder
 
-	###需要处理的特殊文件名
-	special_char=`grep "[ ()&;=']" $PATCH_DIR/pending_folder | wc -l`
+	special_char=`eval grep $grep_special $PATCH_DIR/pending_folder | wc -l`
 
 
 	### 这里将包含特殊文件的行转移到 pending_folder_special_char 中
 	if [ $special_char -ne 0 ]; then
 		cp $PATCH_DIR/pending_folder $PATCH_DIR/pending_folder.bak
-		###需要处理的特殊文件名
-		grep -n "[ ()&;=']" $PATCH_DIR/pending_folder | awk -F ":" '{print $1}' > $PATCH_DIR/all_space_lines
+		eval grep -n $grep_special $PATCH_DIR/pending_folder | awk -F ":" '{print $1}' > $PATCH_DIR/all_space_lines
 		special_lines=`cat $PATCH_DIR/all_space_lines`
 		### 存在特殊字符的行全部转移到 $PATCH_DIR/pending_folder_special_char 中
 		touch $PATCH_DIR/pending_folder_special_char
