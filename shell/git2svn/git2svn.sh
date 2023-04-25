@@ -418,7 +418,7 @@ cp_file_rev()
 					rm $tmp_git2svn
 					exit -1
 				fi
-				#rm $tmp_git2svn
+				rm $tmp_git2svn
 			fi
 			###生成svn补丁脚本
 			### 类型改变需要先删除然后再次添加
@@ -974,8 +974,12 @@ check_cmd sed git
 #####
 check_svn_git_name
 init
-git_check_br
+###先更新再检查是否存在分支
 update_svn_git
+git_check_br
+if [ $NOT_PULL -eq 0 ]; then
+	git_pull_git_repo
+fi
 
 
 ##主函数
