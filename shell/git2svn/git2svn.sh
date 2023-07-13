@@ -53,6 +53,8 @@ G_CC_F=""
 G_DEL=1
 G_GIT_URL=""
 G_SVN_CM_TYPE=0
+G_SVN_PWD_USR_PATH=""
+G_SVN_PWD_USR=""
 
 ####需要处理的特殊文件名
 grep_special="\"[ ()&;=']\""
@@ -188,11 +190,11 @@ gen_pre_if_else()
 ### $1 生成在哪个shell脚本中
 gen_svn_st_check()
 {
-	echo "svn_st=\`svn st ./ | wc -l\`" >> $1
+	echo "svn_st=\`svn \$G_SVN_PWD_USR st ./ | wc -l\`" >> $1
 	echo "if [ \$svn_st -ne 0 ]; then " >> $1
 	echo "	echo \" sync $REV2 to svn The svn repository is not clean \"" >> $1
 	echo "	echo \" now try to clean the svn repository \"" >> $1
-	echo "	svn st ./ --no-ignore | awk '{print \$2}' | xargs rm -rf;svn revert ./ --depth infinity" >> $1
+	echo "	svn \$G_SVN_PWD_USR st ./ --no-ignore | awk '{print \$2}' | xargs rm -rf;svn \$G_SVN_PWD_USR  revert ./ --depth infinity" >> $1
 	echo "fi" >> $1
 	echo -ne "\n"  >> $1
 }
@@ -244,9 +246,9 @@ gen_git_commitid_list()
 	echo "${G_CC_F}SVN_REPO_DIR=\$GIT2SVN_TOP/../$SVN_NAME" >> $1
 	echo "${G_CC_F}curr=\`pwd\`" >> $1
 	echo "${G_CC_F}cd \$SVN_REPO_DIR" >> $1
-	echo "${G_CC_F}svn info > /dev/null" >> $1
+	echo "${G_CC_F}svn \$G_SVN_PWD_USR info > /dev/null" >> $1
 	echo "${G_CC_F}if [ \$? = 0 ]; then" >> $1
-	echo "${G_CC_F}	svn log | grep \"git_commit_id:\" > $2 & " >> $1
+	echo "${G_CC_F}	svn \$G_SVN_PWD_USR log | grep \"git_commit_id:\" > $2 & " >> $1
 	echo "${G_CC_F}	echo \"generate git_commitid_list please wait\" " >> $1
 	echo "${G_CC_F}	bc_jobs=\`jobs | grep \"git_commit_id:\" | grep -i running | wc -l \`" >> $1
 	echo "${G_CC_F}	while ((bc_jobs!=0))" >> $1
@@ -349,9 +351,11 @@ cp_file_rev()
 	exec_on_cmd=""
 
 	if [ $((exec_on & 1)) -eq 1 -o $7 -eq 1 ]; then
-		exec_on_cmd="svn propset svn:executable on ${r_file}${exist_at}"
+		exec_on_cmd="svn \$G_SVN_PWD_USR propset svn:executable on ${r_file}${exist_at}"
+		exec_on_cmd_echo="svn propset svn:executable on ${r_file}${exist_at}"
 	else
-		exec_on_cmd="svn propdel svn:executable ${r_file}${exist_at}"
+		exec_on_cmd="svn \$G_SVN_PWD_USR propdel svn:executable ${r_file}${exist_at}"
+		exec_on_cmd_echo="svn propdel svn:executable ${r_file}${exist_at}"
 	fi
 
 	#### 针对文件的修改（A D M R T）操作
@@ -361,7 +365,7 @@ cp_file_rev()
 		svn_d_cmd="$r_file"
 		echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 		if [ "$svn_d_cmd" != "" ]; then
-			echo "svn delete ${svn_d_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "svn \$G_SVN_PWD_USR delete ${svn_d_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
 			gen_pre_cmd_check "exec svn delete $svn_d_cmd fail" $PATCH_DIR/$SVN_CMD_FILE
 		fi
 
@@ -424,7 +428,7 @@ cp_file_rev()
 			### 类型改变需要先删除然后再次添加
 			if [ "#$5" == "#T" ]; then
 				echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
-				echo "svn delete $r_file${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "svn \$G_SVN_PWD_USR delete $r_file${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
 				gen_pre_cmd_check "\"exec svn delete \$SVN_REPO_DIR/$r_file${exist_at} fail\"" $PATCH_DIR/$SVN_CMD_FILE
 			fi
 			echo "mkdir -p \$SVN_REPO_DIR/$r_dirname_new 2>/dev/null" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -444,20 +448,20 @@ cp_file_rev()
 			echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 			##如果是类型改变 还需在这里添加
 			if [ "#$5" == "#T" ]; then
-				echo "svn add --parents $r_file${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "svn \$G_SVN_PWD_USR add --parents $r_file${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
 				gen_pre_cmd_check "\"exec svn add --parents $r_file${exist_at}\"" $PATCH_DIR/$SVN_CMD_FILE
 			fi
 
 			if [ "$svn_d_cmd" != "" ]; then
-				echo "svn delete ${svn_d_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "svn \$G_SVN_PWD_USR delete ${svn_d_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
 				gen_pre_cmd_check "exec svn delete $svn_d_cmd fail" $PATCH_DIR/$SVN_CMD_FILE
 			fi
 			if [ "$svn_a_cmd" != "" ]; then
-				echo "svn add --parents ${svn_a_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "svn \$G_SVN_PWD_USR  add --parents ${svn_a_cmd}${exist_at}" >> $PATCH_DIR/$SVN_CMD_FILE
 				gen_pre_cmd_check "exec svn add --parents $svn_a_cmd fail" $PATCH_DIR/$SVN_CMD_FILE
 			fi
 			echo "$exec_on_cmd" >> $PATCH_DIR/$SVN_CMD_FILE
-			gen_pre_cmd_check "\" exec $exec_on_cmd fail\"" $PATCH_DIR/$SVN_CMD_FILE
+			gen_pre_cmd_check "\" exec $exec_on_cmd_echo fail\"" $PATCH_DIR/$SVN_CMD_FILE
 		else
 			echo -e "$RED at $1 (git show $1:$r_file) fail change_type=$5"
 			echo -e "patch at ${PATCH_DIR_DATE}/$REV2_NAME"
@@ -522,6 +526,7 @@ gen_patch()
 
 	###生成svn补丁脚本（初始化svn补丁脚本）
 	echo "#!/bin/bash" > $PATCH_DIR/$SVN_CMD_FILE
+	echo "G_SVN_PWD_USR=\"$G_SVN_PWD_USR\"" >> $PATCH_DIR/$SVN_CMD_FILE
 	gen_find_top $PATCH_DIR/$SVN_CMD_FILE
 	echo "SVN_REPO_DIR=\$GIT2SVN_TOP/../$SVN_NAME" >> $PATCH_DIR/$SVN_CMD_FILE
 	echo "PATCH_DIR_MODIFIED=\$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/modified" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -529,7 +534,7 @@ gen_patch()
 	echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
 	gen_svn_st_check $PATCH_DIR/$SVN_CMD_FILE
 	###清空svn空间 后 svn up 一下
-	echo "svn up " >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "svn \$G_SVN_PWD_USR up " >> $PATCH_DIR/$SVN_CMD_FILE
 
 	###svn补丁脚本加入总的执行脚本中
 	echo "\$GIT2SVN_TOP/\$BR_DIR/$REV2_NAME/$SVN_CMD_FILE" >> ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh
@@ -695,11 +700,11 @@ gen_patch()
 			do
 				echo "tmp_ar=$ap" >> $PATCH_DIR/$SVN_CMD_FILE
 				echo "if [ ! -d \$tmp_ar ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
-				echo "	svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "	svn \$G_SVN_PWD_USR delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
 				echo "else" >> $PATCH_DIR/$SVN_CMD_FILE
 				echo "	while [ \"#\`ls -A \$tmp_ar\`\" == \"#\" ]" >> $PATCH_DIR/$SVN_CMD_FILE
 				echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
-				echo "		svn delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
+				echo "		svn \$G_SVN_PWD_USR delete \$tmp_ar" >> $PATCH_DIR/$SVN_CMD_FILE
 				echo "		tmp_ar=\`echo \$tmp_ar | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
 				echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
 				echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -714,14 +719,14 @@ gen_patch()
 			ap=`sed -n "${sp_ap_i}p" $PATCH_DIR/pending_folder_special_char`
 			echo "tmp_ar=$ap" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "if [ ! -d \"\$tmp_ar\" ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "	svn delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "	svn \$G_SVN_PWD_USR delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "else" >> $PATCH_DIR/$SVN_CMD_FILE
 			#### 需要处理的特殊文件名
 			echo "	find_tmp_ar=\"\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g' -e \"s#'#\\\\'#g\" \`\"" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	fwl=\`find \"\$find_tmp_ar\" | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	while [ \$? -eq 0 -a \$fwl -eq 1 ]" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "		svn delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "		svn \$G_SVN_PWD_USR delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "		tmp_ar=\`echo \"\$tmp_ar\" | sed  -e 's#/+\$##g' -e 's#/*[^/]*\$##g'\`" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "		if [ \"#\$tmp_ar\" == \"#\" ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "			break" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -735,7 +740,7 @@ gen_patch()
 
 	####svn commit 提交
 	echo "cd \$SVN_REPO_DIR" >> $PATCH_DIR/$SVN_CMD_FILE
-	echo "svn commit -F \$PATCH_DIR_MODIFIED/../$SVN_COMM_FILE " >> $PATCH_DIR/$SVN_CMD_FILE
+	echo "svn \$G_SVN_PWD_USR commit -F \$PATCH_DIR_MODIFIED/../$SVN_COMM_FILE " >> $PATCH_DIR/$SVN_CMD_FILE
 	###生成判断函数 上条命令是否执行成功
 	gen_svn_commmit_info "\"svn commit -F \$PATCH_DIR_MODIFIED/../$SVN_COMM_FILE fail\"" $PATCH_DIR/$SVN_CMD_FILE "\$PATCH_DIR_MODIFIED/../$SVN_COMM_FILE"
 	echo "echo \"$REV2\" > \$GIT2SVN_TOP/../$GIT_NAME/$GIT_SYNC_LOG_FOLDER/${BR_NAME}_latest_commit_id" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -906,7 +911,7 @@ svn_update_repo()
 {
 	curr_pwd=`pwd`
 	cd $SVN_REPO_DIR
-	svn update ./
+	svn $G_SVN_PWD_USR update ./
 	if [ $? -ne 0 ]; then
 		echo -e "$RED\n svn update ./ error \n$PLAIN"
 		exit -1
@@ -932,6 +937,7 @@ usage()
 	echo -e "\t-c Check if the SVN repository has synced git commmit(default=1, 0:not check)"
 	echo -e "\t-d delete git patchs after success sync (default=1, 0:not delete)"
 	echo -e "\t-m svn commit message type (default=0,(one line message); 1,(multi line message))"
+	echo -e "\t-p svn repo user and pwssword: --username test --password test"
 	echo -e "\tfor example: "
 	echo -e "\t\t$0 -b main -g git_repo -s svn_repo"
 	exit -1
@@ -942,7 +948,7 @@ if [ $# -eq 0 ]; then
 fi
 
 
-while getopts "g:s:b:c:d:m:n" OPT
+while getopts "g:s:b:c:d:m:p:n" OPT
 do
 	case $OPT in
 		b)
@@ -959,10 +965,26 @@ do
 		NOT_PULL=1 ;;
 		m)
 		G_SVN_CM_TYPE=$OPTARG ;;
+		p)
+		G_SVN_PWD_USR_PATH=$OPTARG ;;
 		?)
 		usage;;
 	esac
 done
+
+if [ "#$G_SVN_PWD_USR_PATH" != "#" ]; then
+	tmp_svn_p=`grep "\-\-username " $G_SVN_PWD_USR_PATH | wc -l`
+	tmp_svn_u=`grep "\-\-password " $G_SVN_PWD_USR_PATH | wc -l`
+	if [ $tmp_svn_p -ne 1 -o $tmp_svn_u -ne 1 ]; then
+		echo "-p $G_SVN_PWD_USR_PATH format is invalid"
+		echo "for example: "
+		echo "--username work --password java"
+		exit
+	fi
+	G_SVN_PWD_USR="`cat $G_SVN_PWD_USR_PATH`"
+else
+	G_SVN_PWD_USR=""
+fi
 
 if [ $G_CHECK_COMMIT -eq 0 ]; then
 	G_CC_F="#"
