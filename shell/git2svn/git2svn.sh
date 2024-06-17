@@ -11,6 +11,8 @@
 
 ### 该脚本需要如下前提条件
 ### 已经配置好需要同步的git仓库和svn仓库(git仓库和svn仓库下均能正常执行git 或 svn相关命令 而不需要每次输入密码)
+###     特殊说明 svn仓库可以使用 -p passowrd_user_path 这样的命令指定一个密码文件 不在需要“svn相关命令不需要每次输入密码”
+###              git仓库仍然要求不需要输入密码的情况下能够 正常的执行git命令
 ### 如下实例：
 ### 确保配置好需要同步的git svn仓库：如下所述
 ### 1.工作目录下有两个文件夹(git_repo svn_repo)和一个文件(git2svn.sh)
@@ -53,6 +55,7 @@ G_CC_F=""
 G_DEL=1
 G_GIT_URL=""
 G_SVN_CM_TYPE=0
+G_SVN_LOG_CHK_LEN=0
 G_SVN_PWD_USR_PATH=""
 G_SVN_PWD_USR=""
 
@@ -248,7 +251,11 @@ gen_git_commitid_list()
 	echo "${G_CC_F}cd \$SVN_REPO_DIR" >> $1
 	echo "${G_CC_F}svn \$G_SVN_PWD_USR info > /dev/null" >> $1
 	echo "${G_CC_F}if [ \$? = 0 ]; then" >> $1
-	echo "${G_CC_F}	svn \$G_SVN_PWD_USR log | grep \"git_commit_id:\" > $2 & " >> $1
+	if [ $G_SVN_LOG_CHK_LEN -eq 0 ]; then
+		echo "${G_CC_F}	svn \$G_SVN_PWD_USR log | grep \"git_commit_id:\" > $2 & " >> $1
+	else
+		echo "${G_CC_F}	svn \$G_SVN_PWD_USR log -l $G_SVN_LOG_CHK_LEN| grep \"git_commit_id:\" > $2 & " >> $1
+	fi
 	echo "${G_CC_F}	echo \"generate git_commitid_list please wait\" " >> $1
 	echo "${G_CC_F}	bc_jobs=\`jobs | grep \"git_commit_id:\" | grep -i running | wc -l \`" >> $1
 	echo "${G_CC_F}	while ((bc_jobs!=0))" >> $1
@@ -937,6 +944,7 @@ usage()
 	echo -e "\t-c Check if the SVN repository has synced git commmit(default=1, 0:not check)"
 	echo -e "\t-d delete git patchs after success sync (default=1, 0:not delete)"
 	echo -e "\t-m svn commit message type (default=0,(one line message); 1,(multi line message))"
+	echo -e "\t-l gen_git_commitid_list unmber (svn log -l xxx) (default=0))"
 	echo -e "\t-p svn repo user and pwssword: --username test --password test"
 	echo -e "\tfor example: "
 	echo -e "\t\t$0 -b main -g git_repo -s svn_repo"
@@ -948,7 +956,7 @@ if [ $# -eq 0 ]; then
 fi
 
 
-while getopts "g:s:b:c:d:m:p:n" OPT
+while getopts "g:s:b:c:d:m:p:l:n" OPT
 do
 	case $OPT in
 		b)
@@ -965,6 +973,8 @@ do
 		NOT_PULL=1 ;;
 		m)
 		G_SVN_CM_TYPE=$OPTARG ;;
+		l)
+		G_SVN_LOG_CHK_LEN=$OPTARG ;;
 		p)
 		G_SVN_PWD_USR_PATH=$OPTARG ;;
 		?)
@@ -978,7 +988,7 @@ if [ "#$G_SVN_PWD_USR_PATH" != "#" ]; then
 	if [ $tmp_svn_p -ne 1 -o $tmp_svn_u -ne 1 ]; then
 		echo "-p $G_SVN_PWD_USR_PATH format is invalid"
 		echo "for example: "
-		echo "--username work --password java"
+		echo "--username test --password test"
 		exit
 	fi
 	G_SVN_PWD_USR="`cat $G_SVN_PWD_USR_PATH`"
