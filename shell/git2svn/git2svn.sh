@@ -774,6 +774,7 @@ main()
 
 		mkdir -p ${PATCH_DIR_DATE}
 		echo "#!/bin/bash" > ${PATCH_DIR_DATE}/patch_all.sh
+		echo "G_SVN_PWD_USR=\"$G_SVN_PWD_USR\"" >> ${PATCH_DIR_DATE}/patch_all.sh
 		chmod +x ${PATCH_DIR_DATE}/patch_all.sh
 		gen_find_top ${PATCH_DIR_DATE}/patch_all.sh
 		gen_git_commitid_list ${PATCH_DIR_DATE}/patch_all.sh \$GIT2SVN_TOP/\$BR_DIR/git_commitid_list
