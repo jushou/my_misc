@@ -798,20 +798,41 @@ main()
 }
 
 
-####检测svn仓库和git仓库文件夹是否存在
-check_svn_git_name()
+####初始化svn 和git仓库（下载git 和 svn仓库）
+init_svn_git_repo()
 {
 	if [ ! -d $SVN_NAME ];then
-		echo "arg -s $SVN_NAME not exist"
-		exit -1
+		if [ "#$SVN_URL" != "#" ]; then
+			echo "clone svn $SVN_URL $SVN_NAME ing...."
+			svn co $G_SVN_PWD_USR $SVN_URL $SVN_NAME
+			if [ $? -ne 0 ]; then
+				echo "svn co $SVN_URL $SVN_NAME"
+				exit -1
+			fi
+		fi
 	fi
 
 	if [ ! -d $GIT_NAME ];then
-		echo "arg -g $GIT_NAME not exist"
-		exit -1
+		if [ "#$GIT_URL" != "#" ]; then
+			echo "clone git $GIT_URL $GIT_NAME ing...."
+			git clone $GIT_URL $GIT_NAME
+			if [ $? -ne 0 ]; then
+				echo "git clone $GIT_URL $GIT_NAME"
+				exit -1
+			fi
+		fi
 	fi
 }
 
+get_svn_log_git_commitid()
+{
+	cd $SVN_REPO_DIR
+	tmp_git_cmmit=`svn $G_SVN_PWD_USR log -l 1 | grep git_commit_id | grep -o -P "[0-9a-fA-F]{40}"`
+	if [ "#$tmp_git_cmmit" != "#" ]; then
+		echo "$tmp_git_cmmit"
+	fi
+	cd $PWD
+}
 
 init()
 {
@@ -829,9 +850,22 @@ init()
 	fi
 
 	if [ ! -e $LATEST_COMMIT_ID ]; then
-		echo -e "$RED Please fill in a long commit id ($GIT_NAME repository ) or |\"null\" into"
-		echo -e "$LATEST_COMMIT_ID $PLAIN"
-		exit -1
+		# 从svn仓库中找到 LATEST_COMMIT_ID
+		if [ -d $SVN_NAME ]; then
+			tmp_commit_id=`get_svn_log_git_commitid`
+			if [ "#$tmp_commit_id" != "#" ]; then
+				echo $tmp_commit_id > $LATEST_COMMIT_ID
+			else
+				echo -e "$RED Please fill in a long commit id ($GIT_NAME repository ) or |\"null\" into"
+				echo -e "$LATEST_COMMIT_ID $PLAIN"
+				exit -1
+			fi
+		else
+			echo -e "$RED Please fill in a long commit id ($GIT_NAME repository ) or |\"null\" into"
+			echo -e "$LATEST_COMMIT_ID $PLAIN"
+			exit -1
+		fi
+		
 	fi
 
 	###生成补丁路径
@@ -940,7 +974,9 @@ usage()
 {
 	echo -e "\tgit_repo svn_repo and $0 must be in the same level directory "
 	echo -e "\t$0 -b -g -s "
+	echo -e "\t-G git_repo_url"
 	echo -e "\t-g git_repo_path_name \n\t-b git_branch_name \n\t-s svn_repo_path_name "
+	echo -e "\t-S svn_repo_url"
 	echo -e "\t-n not pull git and svn repo"
 	echo -e "\t-c Check if the SVN repository has synced git commmit(default=1, 0:not check)"
 	echo -e "\t-d delete git patchs after success sync (default=1, 0:not delete)"
@@ -948,7 +984,7 @@ usage()
 	echo -e "\t-l gen_git_commitid_list unmber (svn log -l xxx) (default=0))"
 	echo -e "\t-p svn repo user and pwssword: --username test --password test"
 	echo -e "\tfor example: "
-	echo -e "\t\t$0 -b main -g git_repo -s svn_repo"
+	echo -e "\t\t$0 -b main -g git_repo -G github.com/git_xxx -s svn_repo -S svnhub.com/svn_xxx"
 	exit -1
 }
 
@@ -957,13 +993,17 @@ if [ $# -eq 0 ]; then
 fi
 
 
-while getopts "g:s:b:c:d:m:p:l:n" OPT
+while getopts "g:G:s:S:b:c:d:m:p:l:n" OPT
 do
 	case $OPT in
 		b)
 		BR_NAME=$OPTARG ;;
+		S)
+		SVN_URL=$OPTARG ;;
 		s)
 		SVN_NAME=$OPTARG ;;
+		G)
+		GIT_URL=$OPTARG ;;
 		g)
 		GIT_NAME=$OPTARG ;;
 		c)
@@ -1005,7 +1045,7 @@ fi
 check_cmd sed git
 
 #####
-check_svn_git_name
+init_svn_git_repo
 init
 ###先更新再检查是否存在分支
 update_svn_git
