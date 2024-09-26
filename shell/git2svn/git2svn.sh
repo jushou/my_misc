@@ -853,8 +853,10 @@ init()
 		# 从svn仓库中找到 LATEST_COMMIT_ID
 		if [ -d $SVN_NAME ]; then
 			tmp_commit_id=`get_svn_log_git_commitid`
-			if [ "#$tmp_commit_id" != "#" ]; then
+			if [ "#$tmp_commit_id" != "#" ]; then ##从svn中找到 LATEST_COMMIT_ID
 				echo $tmp_commit_id > $LATEST_COMMIT_ID
+			elif [ "#$START_COMMIT_ID" != "#" ]; then ## 使用 -H 参数传递的 LATEST_COMMIT_ID
+				echo $START_COMMIT_ID > $LATEST_COMMIT_ID
 			else
 				echo -e "$RED Please fill in a long commit id ($GIT_NAME repository ) or |\"null\" into"
 				echo -e "$LATEST_COMMIT_ID $PLAIN"
@@ -974,6 +976,7 @@ usage()
 {
 	echo -e "\tgit_repo svn_repo and $0 must be in the same level directory "
 	echo -e "\t$0 -b -g -s "
+	echo -e "\t-H git_lastest_commit_id (a long commit id)"
 	echo -e "\t-G git_repo_url"
 	echo -e "\t-g git_repo_path_name \n\t-b git_branch_name \n\t-s svn_repo_path_name "
 	echo -e "\t-S svn_repo_url"
@@ -981,7 +984,7 @@ usage()
 	echo -e "\t-c Check if the SVN repository has synced git commmit(default=1, 0:not check)"
 	echo -e "\t-d delete git patchs after success sync (default=1, 0:not delete)"
 	echo -e "\t-m svn commit message type (default=0,(one line message); 1,(multi line message))"
-	echo -e "\t-l gen_git_commitid_list unmber (svn log -l xxx) (default=0))"
+	echo -e "\t-l gen_git_commitid_list number (svn log -l xxx) (default=0))"
 	echo -e "\t-p svn repo user and pwssword: --username test --password test"
 	echo -e "\tfor example: "
 	echo -e "\t\t$0 -b main -g git_repo -G github.com/git_xxx -s svn_repo -S svnhub.com/svn_xxx"
@@ -993,11 +996,18 @@ if [ $# -eq 0 ]; then
 fi
 
 
-while getopts "g:G:s:S:b:c:d:m:p:l:n" OPT
+while getopts "g:G:s:S:b:H:c:d:m:p:l:n" OPT
 do
 	case $OPT in
 		b)
 		BR_NAME=$OPTARG ;;
+		H)
+		START_COMMIT_ID=$OPTARG 
+		tmp_start_cmmid=`echo $START_COMMIT_ID | grep -o -P "[0-9a-fA-F]{40}"`
+		if [ "#$tmp_start_cmmid" == "#"  ]; then
+			echo -e "$RED The argument to -H must be a long commit id"
+			exit -1
+		fi;;
 		S)
 		SVN_URL=$OPTARG ;;
 		s)
