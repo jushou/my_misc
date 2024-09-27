@@ -17,24 +17,22 @@
 ### 确保配置好需要同步的git svn仓库：如下所述
 ### 1.工作目录下有两个文件夹(git_repo svn_repo)和一个文件(git2svn.sh)
 ###      git_repo svn_repo git2svn.sh
-###   git_repo 表示git仓库 这个仓库能够正常执行git status 、git log 、 git pull 等操作(不需要输入用户名密码)
-###   svn_repo 表示svn仓库 这个仓库能够正常执行svn st 、svn log 、 git up 等操作(不需要输入用户名密码)
-### 2.执行./git2svn.sh -b main -g git_repo -s svn_repo
+###   git_repo 表示git仓库 这个仓库能够正常执行git status 、git log 、 git pull 等操作(不需要输入用户名密码,强烈检视git仓库使用ssh协议)
+###   svn_repo 表示svn仓库 这个仓库能够正常执行svn st 、svn log 、 git up 等操作(建议使用 -p参数 指定用户名和密码)
+### 2.执行./git2svn.sh -b main -g git_repo -s svn_repo -S svn_url -G git_url -H 33b36a7e062bd272fc7c0bac1749f7496f8e5009 -p ~/svn_rw_user_pwd
 ###     其中 -b 表示 同步 git 仓库的 main分支
 ###     其中 -g 表示 同步 git 仓库的 所在目录
 ###     其中 -s 表示 同步 svn 仓库的 所在目录
-### 3.初次执行./git2svn.sh -b main -g git_repo -s svn_repo会如下出错信息：(因为脚本还不知道需要从git 的那次提交开始同步)
-###      ./git2svn.sh -b main -g wifi/ -s svn_wifi/
-###       Please fill in a long commit id (wifi repository ) or |"null" into
-###      /home/work/workspace/git/test/wifi/.sync_git_to_svn/main_latest_commit_id
-###    需要在git仓库wifi的.sync_git_to_svn/main_latest_commit_id中填写最后一次成功同步的commit id
-###    也可以输入在该文件第一行中填入 null 表示从git 仓库第一次commit 开始同步
-### 4.git2svn.sh脚本完成的第一步（生成补丁）后 会在 git_repo svn_repo git2svn.sh同级目录下生成 patchs_git_to_svn
+###     其中 -S 表示 svn 仓库的URL 路径
+###     其中 -G 表示 git 仓库的URL 路径
+###     其中 -H 表示 latest_commit_id 也就是同步成功的git commit 这里的H表示 hash 的意思(表示从git仓库的 commit_id 开始同步)
+###     其中 -p 表示 存储svn仓库的用户密码的文件。格式为 --username test --password test
+### 3.git2svn.sh脚本完成的第一步（生成补丁）后 会在 git_repo svn_repo git2svn.sh同级目录下生成 patchs_git_to_svn
 ###     文件夹，该文件夹下会根据 仓库名_分支/日期_序号/ 的方式生成二级文件夹 该文件夹下包含前文提到的 patch_all.sh 脚本
 ###     和所有的（生成补丁）步骤中的历史文件
 ###   正常情况下 git2svn.sh 脚本会自动调用 patch_all.sh 脚本来实现git 到 svn 的同步
 ###   如果出现错误可以根据错误提示确认错误发生的原因，出来好后再次手动调用patch_all.sh脚本可以完成后续未完成的事情
-### 5.成功执行同步后git2svn.sh脚本会主动删除 patchs_git_to_svn/仓库名_分支/日期_序号/ 文件夹
+### 4.成功执行同步后git2svn.sh脚本会主动删除 patchs_git_to_svn/仓库名_分支/日期_序号/ 文件夹
 ###   否则生成的 patchs_git_to_svn/仓库名_分支/日期_序号/ 文件夹不会被删除
 
 
@@ -985,9 +983,9 @@ usage()
 	echo -e "\t-d delete git patchs after success sync (default=1, 0:not delete)"
 	echo -e "\t-m svn commit message type (default=0,(one line message); 1,(multi line message))"
 	echo -e "\t-l gen_git_commitid_list number (svn log -l xxx) (default=0))"
-	echo -e "\t-p svn repo user and pwssword: --username test --password test"
+	echo -e "\t-p a file that stores the user password for the svn repository. The format is --username test --password test"
 	echo -e "\tfor example: "
-	echo -e "\t\t$0 -b main -g git_repo -G github.com/git_xxx -s svn_repo -S svnhub.com/svn_xxx"
+	echo -e "\t\t$0 -b main -g git_repo -G github.com/git_xxx -s svn_repo -S svnhub.com/svn_xxx -p ~/svn_rw_pwd"
 	exit -1
 }
 
