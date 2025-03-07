@@ -58,7 +58,7 @@ G_SVN_PWD_USR_PATH=""
 G_SVN_PWD_USR=""
 
 ####需要处理的特殊文件名
-grep_special="\"[ ()&;='$]\""
+grep_special="\[ ()&;='$\]\"~"
 
 
 ##获取commit作者 $1 表示commit_id
@@ -321,8 +321,8 @@ cp_file_rev()
 		r_dirname_new=`dirname $3`
 	else
 		###需要处理的特殊文件名
-		r_dirname_org=`echo $2 | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' -e 's/=/\\=/g' -e 's/;/\\;/g' -e "s/'/\\'/g" -e "s/\\$/\\\\$/g" | sed 's#[^/]*$##g'`
-		r_dirname_new=`echo $3 | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' -e 's/=/\\=/g' -e 's/;/\\;/g' -e "s/'/\\'/g" -e "s/\\$/\\\\$/g" | sed 's#[^/]*$##g'`
+		r_dirname_org=`echo $2 | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' -e 's/=/\\=/g' -e 's/;/\\;/g' -e "s/'/\\'/g" -e "s/\\$/\\\\$/g" -e "s/\\~/\\\\~/g" | sed 's#[^/]*$##g'`
+		r_dirname_new=`echo $3 | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' -e 's/=/\\=/g' -e 's/;/\\;/g' -e "s/'/\\'/g" -e "s/\\$/\\\\$/g" -e "s/\\~/\\\\~/g" | sed 's#[^/]*$##g'`
 	fi
 	svn_a_cmd=""
 	svn_d_cmd=""
@@ -388,9 +388,9 @@ cp_file_rev()
 			git_show_rst=$?
 			if [ $git_show_rst -ne 0 ]; then
 				rm $tmp_git2svn
+				rm $temp_file
 			fi
 		fi
-
 		if [ $git_show_rst -eq 0 ] ; then
 			###在补丁文件夹中生成文件
 			if [ $6 -eq 0 ]; then
@@ -404,9 +404,9 @@ cp_file_rev()
 				fi
 			else
 				##需要处理的特殊文件名
-				r_file_full=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' -e 's/=/\\=/g' -e 's/;/\\;/g' -e "s/'/\\'/g" -e "s/\\$/\\\\$/g" | sed 's#[^/]*$##g'`
-				modified_r_file=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g' -e "s/'/\\\\'/g" -e "s/\\$/\\\\\\\\$/g" `
-				ln_sf_r_file=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\\\\\\\\\\\\\\\\\\\ /g' -e 's/(/\\\\\\\\\\\\\\\\\\\\(/g' -e 's/)/\\\\\\\\\\\\\\\\\\\\)/g' -e 's/&/\\\\\\\\\\\\\\\\\\\\&/g' -e 's/=/\\\\\\\\\\\\\\\\\\\\=/g' -e 's/;/\\\\\\\\\\\\\\\\\\\\;/g' -e "s/'/\\\\\\\\\\\\\\\\\\\\'/g" -e "s/\\$/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\$/g"`
+				r_file_full=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\ /g' -e 's/(/\\(/g' -e 's/)/\\)/g' -e 's/&/\\&/g' -e 's/=/\\=/g' -e 's/;/\\;/g' -e "s/'/\\'/g" -e "s/\\$/\\\\$/g" -e "s/\\~/\\\\~/g" | sed 's#[^/]*$##g'`
+				modified_r_file=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g' -e "s/'/\\\\'/g" -e "s/\\$/\\\\\\\\$/g" -e "s/\\~/\\\\\\\\~/g" `
+				ln_sf_r_file=`echo $PATCH_DIR_MODIFIED/$r_file | sed -e 's/ /\\\\\\\\\\\\\\\\\\\\ /g' -e 's/(/\\\\\\\\\\\\\\\\\\\\(/g' -e 's/)/\\\\\\\\\\\\\\\\\\\\)/g' -e 's/&/\\\\\\\\\\\\\\\\\\\\&/g' -e 's/=/\\\\\\\\\\\\\\\\\\\\=/g' -e 's/;/\\\\\\\\\\\\\\\\\\\\;/g' -e "s/'/\\\\\\\\\\\\\\\\\\\\'/g" -e "s/\\$/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\$/g" -e "s/\\~/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\~/g"`
 				echo "mkdir -p $r_file_full " > $tmp_git2svn
 				echo "exit \$?" >> $tmp_git2svn
 				bash $tmp_git2svn
@@ -429,6 +429,7 @@ cp_file_rev()
 				fi
 				rm $tmp_git2svn
 			fi
+			
 			###生成svn补丁脚本
 			### 类型改变需要先删除然后再次添加
 			if [ "#$5" == "#T" ]; then
@@ -549,15 +550,14 @@ gen_patch()
 		gen_common_patch_all_x_pre "\$GIT2SVN_TOP/\$BR_DIR/$base3/patch_all_$base3.sh" ${PATCH_DIR_DATE}/$base3/patch_all_$base3.sh
 	fi
 
-
 	chmod +x $PATCH_DIR/$SVN_CMD_FILE
-
 	mv -f $TMP_FILE all_raw.diff
 
-	special_char=`awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | eval grep $grep_special | wc -l`
+	special_char=`awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep -P "[$grep_special]" | wc -l`
+
 	if [ $special_char -ne 0 ]; then
 		cp all_raw.diff all_raw.diff.bak
-		awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | eval grep -n $grep_special | awk -F ":" '{print $1}' > $PATCH_DIR/all_raw_space_lines
+		awk -F "\t" '{{if(NF>=3){print $2"___"$3} else {print $2}}}' all_raw.diff | grep -P -n "[$grep_special]" | awk -F ":" '{print $1}' > $PATCH_DIR/all_raw_space_lines
 		special_lines=`cat $PATCH_DIR/all_raw_space_lines`
 		### 存在特殊字符的行全部转移到 $PATCH_DIR/all_raw_special_char.diff 中
 		touch $PATCH_DIR/all_raw_special_char.diff
@@ -627,10 +627,11 @@ gen_patch()
 			if [ `expr $a_size_i % 100` -eq 0 ]; then
 				echo -n "."
 			fi
-			###需要处理的特殊文件名 单引号要特殊处理这里不需要添加到 sed -e 中
-			file_old=`awk -F "\t" 'NR=="'$a_size_i'" {if(NF>=2){print  $2} }' $PATCH_DIR/all_raw_special_char.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'  -e 's/\\$/\\\\\\\\$/g'`
 			
-			file_new=`awk -F "\t" 'NR=="'$a_size_i'" {if(NF==3){print  $3} else {print $2}}' $PATCH_DIR/all_raw_special_char.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'  -e 's/\\$/\\\\\\\\$/g'`
+			###需要处理的特殊文件名 单引号要特殊处理这里不需要添加到 sed -e 中
+			file_old=`awk -F "\t" 'NR=="'$a_size_i'" {if(NF>=2){print  $2} }' $PATCH_DIR/all_raw_special_char.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'  -e 's/\\$/\\\\$/g'  -e 's/\\~/\\\\~/g'`
+			
+			file_new=`awk -F "\t" 'NR=="'$a_size_i'" {if(NF==3){print  $3} else {print $2}}' $PATCH_DIR/all_raw_special_char.diff | sed -e 's/ /\\\\ /g' -e 's/(/\\\\(/g' -e 's/)/\\\\)/g' -e 's/&/\\\\&/g' -e 's/=/\\\\=/g' -e 's/;/\\\\;/g'  -e 's/\\$/\\\\$/g' -e 's/\\~/\\\\~/g' `
 			file_mode=`awk 'NR=="'$a_size_i'" {print $2}' $PATCH_DIR/all_raw_special_char.diff`
 			is_link_file=0
 			if [ $file_mode -eq 120000 ]; then
@@ -661,13 +662,13 @@ gen_patch()
 	sort -u -r $PATCH_DIR/pending_folder > $PATCH_DIR/temp_folder
 	mv $PATCH_DIR/temp_folder $PATCH_DIR/pending_folder
 
-	special_char=`eval grep $grep_special $PATCH_DIR/pending_folder | wc -l`
+	special_char=`grep -P "[$grep_special]" $PATCH_DIR/pending_folder | wc -l`
 
 
 	### 这里将包含特殊文件的行转移到 pending_folder_special_char 中
 	if [ $special_char -ne 0 ]; then
 		cp $PATCH_DIR/pending_folder $PATCH_DIR/pending_folder.bak
-		eval grep -n $grep_special $PATCH_DIR/pending_folder | awk -F ":" '{print $1}' > $PATCH_DIR/all_space_lines
+		grep -P -n "[$grep_special]" $PATCH_DIR/pending_folder | awk -F ":" '{print $1}' > $PATCH_DIR/all_space_lines
 		special_lines=`cat $PATCH_DIR/all_space_lines`
 		### 存在特殊字符的行全部转移到 $PATCH_DIR/pending_folder_special_char 中
 		touch $PATCH_DIR/pending_folder_special_char
@@ -727,7 +728,7 @@ gen_patch()
 			echo "	svn \$G_SVN_PWD_USR delete \"\$tmp_ar\"" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "else" >> $PATCH_DIR/$SVN_CMD_FILE
 			#### 需要处理的特殊文件名
-			echo "	find_tmp_ar=\"\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g' -e \"s#'#\\\\'#g\" -e \"s#\\$#\\\\\\\\$#g\" \`\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "	find_tmp_ar=\"\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g' -e \"s#'#\\\\'#g\" -e \"s#\\$#\\\\\\\\$#g\" -e \"s#\\~#\\\\\\\\~#g\" \`\"" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	fwl=\`find \"\$find_tmp_ar\" | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	while [ \$? -eq 0 -a \$fwl -eq 1 ]" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	do" >> $PATCH_DIR/$SVN_CMD_FILE
@@ -736,7 +737,7 @@ gen_patch()
 			echo "		if [ \"#\$tmp_ar\" == \"#\" ]; then" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "			break" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "		fi" >> $PATCH_DIR/$SVN_CMD_FILE
-			echo "		find_tmp_ar=\"\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g' -e \"s#'#\\\\'#g\" -e \"s#\\$#\\\\\\\\$#g\" \`\"" >> $PATCH_DIR/$SVN_CMD_FILE
+			echo "		find_tmp_ar=\"\`echo \$tmp_ar | sed -e 's# #\\\\ #g' -e 's#(#\\\\(#g' -e 's#)#\\\\)#g' -e 's#&#\\\\&#g' -e 's#=#\\\\=#g' -e 's#;#\\\\;#g' -e \"s#'#\\\\'#g\" -e \"s#\\$#\\\\\\\\$#g\" -e \"s#\\~#\\\\\\\\~#g\" \`\"" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "		fwl=\`find \"\$find_tmp_ar\" | wc -l\`" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "	done" >> $PATCH_DIR/$SVN_CMD_FILE
 			echo "fi" >> $PATCH_DIR/$SVN_CMD_FILE
